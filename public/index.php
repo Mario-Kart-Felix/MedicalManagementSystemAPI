@@ -10,7 +10,6 @@ use PHPMailer\PHPMailer\Exception;
 //use Slim\Factory\AppFactory
 require '../vendor/autoload.php';
 require_once '../include/DbHandler.php';
-require_once '../include/AdminDbHandler.php';
 require_once '../vendor/autoload.php';
 require_once '../include/JWT.php';
 
@@ -130,7 +129,6 @@ $app->post('/login', function(Request $request, Response $response)
     }
 });
 
-
 $app->post('/add/product',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -149,7 +147,7 @@ $app->post('/add/product',function(Request $request, Response $response)
                 $productManufactureDate = $requestParameter['productManufactureDate'];
                 $productExpireDate = $requestParameter['productExpireDate'];
                 if($db->addProduct($productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate))
-                    return returnException(true,"Product Added",$response);
+                    return returnException(false,"Product Added",$response);
                 else
                     return returnException(true,"Failed To Add Product",$response);
             }
@@ -168,7 +166,7 @@ $app->post('/add/brand',function(Request $request, Response $response)
                 $requestParameter = $request->getParsedBody();
                 $brandName = $requestParameter['brandName'];
                 if($db->addBrand($brandName))
-                    return returnException(true,"Brand Added",$response);
+                    return returnException(false,"Brand Added",$response);
                 else
                     return returnException(true,"Failed To Add Brand",$response);
             }
@@ -464,7 +462,7 @@ $app->post('/add/size',function(Request $request, Response $response)
                 $requestParameter = $request->getParsedBody();
                 $sizeName = $requestParameter['sizeName'];
                 if($db->addSize($sizeName))
-                    return returnException(true,"Size Added",$response);
+                    return returnException(false,"Size Added",$response);
                 else
                     return returnException(true,"Failed To Add Size",$response);
             }
@@ -575,7 +573,6 @@ $app->get('/products/expiring',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-
 $app->post('/product/sell/delete',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -638,7 +635,7 @@ $app->post('/add/category',function(Request $request, Response $response)
                 $requestParameter = $request->getParsedBody();
                 $categoryName = $requestParameter['categoryName'];
                 if($db->addCategory($categoryName))
-                    return returnException(true,"Category Added",$response);
+                    return returnException(false,"Category Added",$response);
                 else
                     return returnException(true,"Failed To Add Category",$response);
             }
@@ -657,7 +654,7 @@ $app->post('/add/location',function(Request $request, Response $response)
                 $requestParameter = $request->getParsedBody();
                 $locationName = $requestParameter['locationName'];
                 if($db->addLocation($locationName))
-                    return returnException(true,"Location Added",$response);
+                    return returnException(false,"Location Added",$response);
                 else
                     return returnException(true,"Failed To Add Location",$response);
             }
@@ -684,7 +681,6 @@ function checkEmptyParameter($requiredParameter,$request,$response)
         return returnException(true,"Required Parameter ".substr($errorParam,0,-2)." is missing",$response);
     return $error;
 }
-
 
 /*
 just parepare a name, email, mail subject and email id to send the mail,
