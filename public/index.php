@@ -67,7 +67,7 @@ $app->get('/demo',function(Request $request, Response $response,array $args )
     $db->setUserId(190);
     // $users = array();
         $responseG = array();
-        $responseG['data'] = $db->getExpiringProducts();
+        $responseG['data'] = $db->getProductById(60);
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -331,6 +331,30 @@ $app->get('/get/products',function(Request $request, Response $response)
         }
         else
             return returnException(true,"No Products Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/get/product/{productId}',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $productId = $args['productId'];
+        $products = $db->getProductById($productId);
+        if(!empty($products))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Product Found";
+            $resp['products'] = $products;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"Product Not Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
