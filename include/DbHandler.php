@@ -170,6 +170,8 @@ class DbHandler
     {
         $products = array();
         $pro = array();
+        if (!$this->isProductExist($productId))
+           return $pro;
         $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_manufacture,product_expire FROM products WHERE product_id=?";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param('s',$productId);
@@ -309,6 +311,16 @@ class DbHandler
         $query = "SELECT id FROM admin WHERE email=?";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param('s',$email);
+        $stmt->execute();
+        $stmt->store_result();
+        return $stmt->num_rows>0 ;
+    }
+
+    function isProductExist($productId)
+    {
+        $query = "SELECT product_id FROM products WHERE product_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$productId);
         $stmt->execute();
         $stmt->store_result();
         return $stmt->num_rows>0 ;
@@ -571,6 +583,33 @@ class DbHandler
         return $productss;
     }
 
+    function getNoticeProductsCount()
+    {
+        $count = 0;
+        $products = array();
+        $productss = array();
+        $query = "SELECT product_id,product_quantity FROM products ORDER by created_at DESC";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();
+        $stmt->bind_result($productId,$productQuantity);
+        while ($stmt->fetch())
+        {
+            $product['productId']           = $productId;
+            $product['productQuantity']     = $productQuantity;
+            array_push($products, $product);
+        }
+        foreach ($products as  $product)
+        {
+            $salesQuantity = $this->getAllSalesQuantityOfProudctById($product['productId']);
+            if ($product['productQuantity']-$salesQuantity<5)
+            {
+                $count++;
+            }
+        }
+        $pro['productsNoticeCount'] = $count;
+        return $pro;
+    }
+
     function getExpiringProducts()
     {
         $products = array();
@@ -609,6 +648,23 @@ class DbHandler
             array_push($productss, $pro);
         }
         return $productss;
+    }
+
+    function getExpiringProductsCount()
+    {
+        $count = 0;
+        $products = array();
+        $productss = array();
+        $query = "SELECT product_id FROM products WHERE product_expire <= DATE_ADD(CURDATE(), INTERVAL 2 MONTH) && product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire ASC";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();
+        $stmt->bind_result($productId);
+        while ($stmt->fetch())
+        {
+            $count++;
+        }
+        $products['productsExpiringCount'] = $count;
+        return $products;
     }
 
     function getExpiredProducts()

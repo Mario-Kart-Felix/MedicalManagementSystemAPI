@@ -82,7 +82,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->getExpiredProducts();
+        $responseG['data'] = $db->getExpiringProductsCount();
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -379,6 +379,52 @@ $app->get('/get/products/records',function(Request $request, Response $response)
         }
         else
             return returnException(true,"No Products Record Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/counts/products/notice',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $productsNoticeCount = $db->getNoticeProductsCount();
+        if(!empty($productsNoticeCount))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Products Notice Count Found";
+            $resp['products'] = $productsNoticeCount;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Products Notice Count Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/counts/products/expiring',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $productsExpiringCount = $db->getExpiringProductsCount();
+        if(!empty($productsExpiringCount))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Products Expiring Count Found";
+            $resp['products'] = $productsExpiringCount;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Products Expiring Count Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
