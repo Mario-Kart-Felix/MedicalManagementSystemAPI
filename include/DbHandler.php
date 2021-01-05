@@ -466,7 +466,7 @@ class DbHandler
     {
         $products = array();
         $productss = array();
-        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products ORDER by created_at DESC";
+        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products ORDER by product_name ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$productQuantity,$locationId,$productManufacture,$productExpire);
@@ -544,7 +544,7 @@ class DbHandler
     {
         $products = array();
         $productss = array();
-        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products ORDER by created_at DESC";
+        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire DESC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$productQuantity,$locationId,$productManufacture,$productExpire);
@@ -588,7 +588,7 @@ class DbHandler
         $count = 0;
         $products = array();
         $productss = array();
-        $query = "SELECT product_id,product_quantity FROM products ORDER by created_at DESC";
+        $query = "SELECT product_id,product_quantity FROM products";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($productId,$productQuantity);
@@ -614,7 +614,7 @@ class DbHandler
     {
         $products = array();
         $productss = array();
-        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire <= DATE_ADD(CURDATE(), INTERVAL 2 MONTH) && product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire ASC";
+        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire <= DATE_ADD(CURDATE(), INTERVAL 2 MONTH) && product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire DESC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$productQuantity,$locationId,$productManufacture,$productExpire);
@@ -671,7 +671,7 @@ class DbHandler
     {
         $products = array();
         $productss = array();
-        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire<CURDATE() ORDER by created_at ASC";
+        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire<CURDATE() ORDER by product_expire ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$productQuantity,$locationId,$productManufacture,$productExpire);
