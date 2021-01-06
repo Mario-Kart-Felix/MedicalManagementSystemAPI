@@ -82,7 +82,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->getExpiringProductsCount();
+        $responseG['data'] = $db->getAllSellers();
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -151,6 +151,57 @@ $app->post('/add/product',function(Request $request, Response $response)
                 else
                     return returnException(true,"Failed To Add Product",$response);
             }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/add/seller',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('sellerFirstName','sellerLastName','sellerContactNumber','sellerAddress'),$request,$response))
+            {
+                $sellerImage = null;
+                $requestParameters = $request->getUploadedFiles();
+                $requestParameter = $request->getParsedBody();
+                if (!empty($requestParameters['sellerImage']))
+                    $sellerImage = $requestParameters['sellerImage'];
+                $sellerFirstName = $requestParameter['sellerFirstName'];
+                $sellerLastName = $requestParameter['sellerLastName'];
+                $sellerEmail = $requestParameter['sellerEmail'];
+                $sellerContactNumber = $requestParameter['sellerContactNumber'];
+                $sellerContactNumber1 = $requestParameter['sellerContactNumber1'];
+                $sellerAddress = $requestParameter['sellerAddress'];
+                if($db->addSeller($sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress))
+                    return returnException(false,"Seller Information Added",$response);
+                else
+                    return returnException(true,"Failed To Add Seller Information",$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/sellers',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sellers = $db->getSellers();
+        if(!empty($sellers))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Sellers List Found";
+            $resp['sellers'] = $sellers;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Seller Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);

@@ -84,6 +84,66 @@ class DbHandler
             return false;
     }
 
+    function addSeller($sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress)
+    {
+        if (!empty($sellerImage))
+            $sellerImage = $this->uploadImage($sellerImage);
+        else
+            $sellerImage = '';
+        $query = "INSERT INTO sellers (seller_fname,seller_lname,seller_email,seller_contact,seller_contact_1,seller_image,seller_address) VALUES(?,?,?,?,?,?,?)";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param("sssssss",$sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress);
+        if ($stmt->execute())
+        {
+            return true;
+        }
+        else
+            return false;
+    }
+
+     function getSellers()
+    {
+        $sellers = array();
+        $query = "SELECT seller_id,seller_fname,seller_lname,seller_email,seller_contact,seller_contact_1,seller_image,seller_address from sellers ORDER BY seller_id ASC";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();
+        $stmt->bind_result($sellerId,$sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress);
+        while ($stmt->fetch())
+        {
+            $seller['sellerId'] = $sellerId;
+            $seller['sellerFirstName'] = $sellerFirstName;
+            $seller['sellerLastName'] = $sellerLastName;
+            $seller['sellerEmail'] = $sellerEmail;
+            $seller['sellerContactNumber'] = $sellerContactNumber;
+            $seller['sellerContactNumber1'] = $sellerContactNumber1;
+            if (isset($sellerImage) && !empty($sellerImage))
+                $seller['sellerImage'] = WEBSITE_DOMAIN.$sellerImage;
+            else
+                $seller['sellerImage'] = null;
+            $seller['sellerAddress'] = $sellerAddress;
+            array_push($sellers, $seller);
+        }
+        return $sellers;
+    }
+
+
+
+
+    function uploadImage($image)
+    {
+        $imageUrl ="";
+        if ($image!=null) 
+        {
+            $imageName = $image->getClientFilename();
+            $image = $image->file;
+            $targetDir = "uploads/";
+            $targetFile = $targetDir.uniqid().'.'.pathinfo($imageName,PATHINFO_EXTENSION);
+            if (move_uploaded_file($image,$targetFile))
+                $imageUrl = $targetFile;
+        }
+        return $imageUrl;
+    }
+
     function addProductsRecord($productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate)
     {
         $query = "INSERT INTO products_record (product_name,brand_id,category_id,size_id,location_id,product_price,product_quantity,product_manufacture,product_expire) VALUES(?,?,?,?,?,?,?,?,?)";
@@ -614,7 +674,7 @@ class DbHandler
     {
         $products = array();
         $productss = array();
-        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire <= DATE_ADD(CURDATE(), INTERVAL 2 MONTH) && product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire DESC";
+        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire <= DATE_ADD(CURDATE(), INTERVAL 6 MONTH) && product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$productQuantity,$locationId,$productManufacture,$productExpire);
@@ -655,7 +715,7 @@ class DbHandler
         $count = 0;
         $products = array();
         $productss = array();
-        $query = "SELECT product_id FROM products WHERE product_expire <= DATE_ADD(CURDATE(), INTERVAL 2 MONTH) && product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire ASC";
+        $query = "SELECT product_id FROM products WHERE product_expire <= DATE_ADD(CURDATE(), INTERVAL 6 MONTH) && product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($productId);
