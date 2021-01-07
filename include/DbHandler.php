@@ -84,6 +84,21 @@ class DbHandler
             return false;
     }
 
+    function updateProduct($productId,$productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate)
+    {
+        $productQuantity = $productQuantity + $this->getSalesCountByProductId($productId);
+        $query = "UPDATE products SET product_name=?, brand_id=?, category_id=?, size_id=?, location_id=?, product_price=?, product_quantity=?, product_manufacture=?, product_manufacture=? WHERE product_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param("ssssssssss",$productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate,$productId);
+        if ($stmt->execute())
+        {
+            // $this->addProductsRecord($productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate);
+            return true;
+        }
+        else
+            return false;
+    }
+
     function addSeller($sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress)
     {
         if (!empty($sellerImage))
@@ -232,11 +247,11 @@ class DbHandler
         $pro = array();
         if (!$this->isProductExist($productId))
            return $pro;
-        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_manufacture,product_expire FROM products WHERE product_id=?";
+        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,location_id,product_manufacture,product_expire FROM products WHERE product_id=?";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param('s',$productId);
         $stmt->execute();
-        $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$productManufacture,$productExpire);
+        $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$locationId,$productManufacture,$productExpire);
         $stmt->fetch();
         $product['productId']           = $productId;
         $product['categoryId']          = $categoryId;
@@ -244,6 +259,7 @@ class DbHandler
         $product['sizeId']              = $sizeId;
         $product['brandId']             = $brandId;
         $product['productPrice']        = $productPrice;
+        $product['locationId']          = $locationId;
         $product['productManufacture']        = $productManufacture;
         $product['productExpire']        = $productExpire;
         array_push($products, $product);
@@ -257,9 +273,10 @@ class DbHandler
             $pro['productSize']             = $this->getSizeById($product['sizeId']);
             $pro['productBrand']            = $this->getBrandById($product['brandId']);
             $pro['productPrice']            = $product['productPrice'];
+            $pro['productLocation']         = $this->getLocationById($product['locationId']);
             $pro['productQuantity']         = $this->getProductCurrentQuantityById($product['productId']);
-            $pro['productManufacture']      = $product['productManufacture'];
-            $pro['productExpire']           = $product['productExpire'];
+            $pro['productManufacture']      = substr($product['productManufacture'], 0, 7);
+            $pro['productExpire']           = substr($product['productExpire'], 0, 7);
         }
         return $pro;
     }
@@ -468,6 +485,21 @@ class DbHandler
             array_push($pr, $pro);
         }
         return $pr;
+    }
+
+    function getSalesCountByProductId($productId)
+    {
+        $productQuantity = 0;
+        $query = "SELECT sell_quantity FROM sells WHERE product_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$productId);
+        $stmt->execute();
+        $stmt->bind_result($quantity);
+        while ($stmt->fetch())
+        {
+            $productQuantity = $productQuantity+$quantity;
+        }
+        return $productQuantity;
     }
 
     function getAllSalesRecord()

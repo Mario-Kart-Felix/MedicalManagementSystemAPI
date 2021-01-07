@@ -82,7 +82,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->getAllSellers();
+        $responseG['data'] = $db->getSalesCountByProductId(89);
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -127,6 +127,34 @@ $app->post('/login', function(Request $request, Response $response)
         else
             return returnException(true,USER_NOT_FOUND,$response);
     }
+});
+
+$app->post('/update/product',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('productId','productName','productBrand','productCategory','productSize','productLocation','productPrice','productQuantity','productManufactureDate','productExpireDate'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $productId = $requestParameter['productId'];
+                $productName = $requestParameter['productName'];
+                $productBrand = $requestParameter['productBrand'];
+                $productCategory = $requestParameter['productCategory'];
+                $productSize = $requestParameter['productSize'];
+                $productLocation = $requestParameter['productLocation'];
+                $productPrice = $requestParameter['productPrice'];
+                $productQuantity = $requestParameter['productQuantity'];
+                $productManufactureDate = $requestParameter['productManufactureDate'];
+                $productExpireDate = $requestParameter['productExpireDate'];
+                if($db->updateProduct($productId,$productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate))
+                    return returnException(false,"Product Updated",$response);
+                else
+                    return returnException(true,"Failed To Update Product",$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
 });
 
 $app->post('/add/product',function(Request $request, Response $response)
