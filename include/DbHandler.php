@@ -87,7 +87,7 @@ class DbHandler
     function updateProduct($productId,$productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate)
     {
         $productQuantity = $productQuantity + $this->getSalesCountByProductId($productId);
-        $query = "UPDATE products SET product_name=?, brand_id=?, category_id=?, size_id=?, location_id=?, product_price=?, product_quantity=?, product_manufacture=?, product_manufacture=? WHERE product_id=?";
+        $query = "UPDATE products SET product_name=?, brand_id=?, category_id=?, size_id=?, location_id=?, product_price=?, product_quantity=?, product_manufacture=?, product_expire=? WHERE product_id=?";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param("ssssssssss",$productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate,$productId);
         if ($stmt->execute())
