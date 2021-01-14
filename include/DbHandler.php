@@ -10,6 +10,8 @@ class DbHandler
     private $con;
     private $userId;
     private $saleId;
+    private $invoiceNumber;
+    private $invoiceId;
 
     function __construct()
     {
@@ -38,6 +40,26 @@ class DbHandler
     function getSaleId()
     {
         return $this->saleId;
+    }
+
+    function setInvoiceNumber($invoiceNumber)
+    {
+        $this->invoiceNumber = $invoiceNumber;
+    }
+
+    function getInvoiceNumber()
+    {
+        return $this->invoiceNumber;
+    }
+
+    function setInvoiceId($invoiceId)
+    {
+        $this->invoiceId = $invoiceId;
+    }
+
+    function getInvoiceId()
+    {
+        return $this->invoiceId;
     }
 
     function login($email,$password)
@@ -86,7 +108,7 @@ class DbHandler
 
     function updateProduct($productId,$productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate)
     {
-        $productQuantity = $productQuantity + $this->getSalesCountByProductId($productId);
+        $productQuantity = $productQuantity + $this->getSalesCountByProductId($productId)+$this->getSellerSalesCountByProductId($productId);
         $query = "UPDATE products SET product_name=?, brand_id=?, category_id=?, size_id=?, location_id=?, product_price=?, product_quantity=?, product_manufacture=?, product_expire=? WHERE product_id=?";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param("ssssssssss",$productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate,$productId);
@@ -109,9 +131,7 @@ class DbHandler
         $stmt = $this->con->prepare($query);
         $stmt->bind_param("sssssss",$sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress);
         if ($stmt->execute())
-        {
             return true;
-        }
         else
             return false;
     }
@@ -141,8 +161,44 @@ class DbHandler
         return $sellers;
     }
 
+    function getSellerById($sellerId)
+    {
+        $sellers = array();
+        $query = "SELECT seller_id,seller_fname,seller_lname,seller_email,seller_contact,seller_contact_1,seller_image,seller_address from sellers WHERE seller_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$sellerId);
+        $stmt->execute();
+        $stmt->bind_result($sellerId,$sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress);
+        $stmt->fetch();
+        $seller['sellerId'] = $sellerId;
+        $seller['sellerFirstName'] = $sellerFirstName;
+        $seller['sellerLastName'] = $sellerLastName;
+        $seller['sellerEmail'] = $sellerEmail;
+        $seller['sellerContactNumber'] = $sellerContactNumber;
+        $seller['sellerContactNumber1'] = $sellerContactNumber1;
+        if (isset($sellerImage) && !empty($sellerImage))
+            $seller['sellerImage'] = WEBSITE_DOMAIN.$sellerImage;
+        else
+            $seller['sellerImage'] = null;
+        $seller['sellerAddress'] = $sellerAddress;
+        array_push($sellers, $seller);
+        return $sellers;
+    }
 
-
+    function isSellerExist($sellerId)
+    {
+        $sellers = array();
+        $query = "SELECT seller_id FROM sellers WHERE seller_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$sellerId);
+        $stmt->execute();
+        $stmt->bind_result($sId);
+        $stmt->fetch();
+        if (!empty($sId))
+            return true;
+        else
+            return false;
+    }
 
     function uploadImage($image)
     {
@@ -181,6 +237,38 @@ class DbHandler
             return false;
     }
 
+    function getNewInvoiceNumber()
+    {
+        $query = "SELECT invoice_number from invoices ORDER BY invoice_id DESC LIMIT 1";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();
+        $stmt->bind_result($invoiceNumber);
+        $stmt->fetch();
+        if (empty($invoiceNumber))
+            $invoiceNumber = "FHC10000";
+        $companyTag = substr($invoiceNumber,0, 3);
+        $invoiceNumber = (int) substr($invoiceNumber,3, 10)+1;
+        $invoiceNumber = $companyTag.$invoiceNumber;
+        return $invoiceNumber;
+    }
+
+    function addInvoice($sellerId)
+    {
+        date_default_timezone_set('Asia/Kolkata');
+        $date = date('y/m/d', time());
+        $invoiceNumber = $this->getNewInvoiceNumber();
+        $query = "INSERT INTO invoices (invoice_number,seller_id,invoice_date) VALUES(?,?,?)";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param("sss",$invoiceNumber,$sellerId,$date);
+        if ($stmt->execute())
+        {
+            $this->setInvoiceNumber($invoiceNumber);
+            return true;
+        }
+        else
+            return false;
+    }
+
     function sellProduct($productId)
     {
         if ($this->isProductAvailable($productId))
@@ -202,11 +290,33 @@ class DbHandler
             return PRODUCT_QUANTITY_LOW;
     }
 
+    function sellProductToSeller($productId,$invoiceNumber)
+    {
+        if ($this->isProductAvailable($productId))
+        {
+            $productPrice = $this->getProductPriceById($productId);
+            $productQuantity = 1;
+            $query = "INSERT INTO sellers_sells (invoice_number,product_id,sell_quantity,sell_price) VALUES(?,?,?,?)";
+            $stmt = $this->con->prepare($query);
+            $stmt->bind_param("ssss",$invoiceNumber,$productId,$productQuantity,$productPrice);
+            if ($stmt->execute())
+            {
+                $this->setSaleId($stmt->insert_id);
+                return SELL_PRODUCT;
+            }
+            else
+                return SELL_PRODUCT_FAILED;
+        }
+        else
+            return PRODUCT_QUANTITY_LOW;
+    }
+
     function isProductAvailable($productId)
     {
         $productQuantity = $this->getProductQuantityById($productId);
         $salesQuantity = $this->getAllSalesQuantityOfProudctById($productId);
-        if ($productQuantity-$salesQuantity>0)
+        $sellerSalesQuantity = $this->getAllSellerSalesQuantityOfProudctById($productId);
+        if ($productQuantity-$salesQuantity-$sellerSalesQuantity>0)
             return true;
         else
             return false;
@@ -228,9 +338,38 @@ class DbHandler
             return SALE_NOT_EXIST;
     }
 
+    function deleteSellerSoldProduct($sellId)
+    {
+        if($this->isSellerSaleExist($sellId))
+        {
+            $query = "DELETE FROM sellers_sells WHERE sellers_sell_id =?";
+            $stmt = $this->con->prepare($query);
+            $stmt->bind_param("s",$sellId);
+            if ($stmt->execute())
+                return SALE_RECORD_DELETED;
+            else
+                return SALE_RECORD_DELETE_FAILED;
+        }
+        else
+            return SALE_NOT_EXIST;
+    }
+
     function isSaleExist($sellId)
     {
         $query = "SELECT sell_id from sells WHERE sell_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$sellId);
+        $stmt->execute();
+        $stmt->store_result();
+        if ($stmt->num_rows()>0)
+            return true;
+        else
+            return false;
+    }
+
+    function isSellerSaleExist($sellId)
+    {
+        $query = "SELECT sellers_sell_id from sellers_sells WHERE sellers_sell_id =?";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param('s',$sellId);
         $stmt->execute();
@@ -306,16 +445,54 @@ class DbHandler
             return SALE_NOT_EXIST;
     }
 
+    function updateSellerSellProducts($saleId,$productQuantity,$sellDiscount,$productSalePrice)
+    {
+        if ($this->isSellerSaleExist($saleId))
+        {
+            $productId = $this->getProductIdBySellerSaleId($saleId);
+            // $currentSaleQuantity = $this->getSalesProductQuantityById($saleId);
+            $currentSellerSaleQuantity = $this->getSellerSalesProductQuantityById($saleId);
+            if ($this->getProductCurrentQuantityById($productId)+$currentSellerSaleQuantity-$productQuantity>=0) 
+            {
+                 $query = "UPDATE sellers_sells SET sell_quantity=?, sell_discount=?, sell_price=? WHERE sellers_sell_id=?";
+                $stmt = $this->con->prepare($query);
+                $stmt->bind_param('ssss',$productQuantity,$sellDiscount,$productSalePrice,$saleId);
+                if ($stmt->execute())
+                {
+                    return SALE_UPDATED;
+                }
+                else
+                    return SALE_UPDATE_FAILED;
+            }
+            else
+                return PRODUCT_QUANTITY_LOW;
+        }
+        else
+            return SALE_NOT_EXIST;
+    }
+
     function getProductCurrentQuantityById($productId)
     {
-        $currentSaleId = $this->getAllSalesQuantityOfProudctById($productId);
+        $currentSaleQuantity = $this->getAllSalesQuantityOfProudctById($productId);
+        $currentSellerSaleQuantity = $this->getAllSellerSalesQuantityOfProudctById($productId);
         $productQuantity = $this->getProductQuantityById($productId);
-        return $productQuantity-$currentSaleId;
+        return $productQuantity-$currentSaleQuantity-$currentSellerSaleQuantity;
     }
 
     function getSalesProductQuantityById($saleId)
     {
         $query = "SELECT sell_quantity from sells WHERE sell_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$saleId);
+        $stmt->execute();
+        $stmt->bind_result($saleQuanitty);
+        $stmt->fetch();
+        return $saleQuanitty;
+    }
+
+    function getSellerSalesProductQuantityById($saleId)
+    {
+        $query = "SELECT sell_quantity from sellers_sells WHERE sellers_sell_id=?";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param('s',$saleId);
         $stmt->execute();
@@ -337,6 +514,32 @@ class DbHandler
             $allCount = $allCount+$saleQuanitty;
         }
         return $allCount;
+    }
+
+    function getAllSellerSalesQuantityOfProudctById($productId)
+    {
+        $allCount = 0;
+        $query = "SELECT sell_quantity from sellers_sells WHERE product_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$productId);
+        $stmt->execute();
+        $stmt->bind_result($saleQuanitty);
+        while($stmt->fetch())
+        {
+            $allCount = $allCount+$saleQuanitty;
+        }
+        return $allCount;
+    }
+
+    function getProductIdBySellerSaleId($saleId)
+    {
+        $query = "SELECT product_id from sellers_sells WHERE sellers_sell_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$saleId);
+        $stmt->execute();
+        $stmt->bind_result($productId);
+        $stmt->fetch();
+        return $productId;
     }
 
     function getProductIdBySaleId($saleId)
@@ -502,6 +705,21 @@ class DbHandler
         return $productQuantity;
     }
 
+    function getSellerSalesCountByProductId($productId)
+    {
+        $productQuantity = 0;
+        $query = "SELECT sell_quantity FROM sellers_sells WHERE product_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$productId);
+        $stmt->execute();
+        $stmt->bind_result($quantity);
+        while ($stmt->fetch())
+        {
+            $productQuantity = $productQuantity+$quantity;
+        }
+        return $productQuantity;
+    }
+
     function getAllSalesRecord()
     {
         $products = array();
@@ -584,7 +802,7 @@ class DbHandler
             $pro['productSize']             = $this->getSizeById($product['sizeId']);
             $pro['productBrand']            = $this->getBrandById($product['brandId']);
             $pro['productPrice']            = $product['productPrice'];
-            $pro['productQuantity']         = $product['productQuantity']-$this->getSellQuantityByProductId($pro['productId']);
+            $pro['productQuantity']         = $this->getProductCurrentQuantityById($pro['productId']);
             $pro['productLocation']         = $this->getLocationById($product['locationId']);
             $pro['productManufacture']      = substr($product['productManufacture'], 0, 7);
             $pro['productExpire']           = substr($product['productExpire'], 0, 7);

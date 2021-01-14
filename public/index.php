@@ -12,7 +12,7 @@ require '../vendor/autoload.php';
 require_once '../include/DbHandler.php';
 require_once '../vendor/autoload.php';
 require_once '../include/JWT.php';
-
+require_once __DIR__ . '/../vendor/autoload.php';
 $JWT = new JWT;
 
 $app = new \Slim\App;;
@@ -64,13 +64,26 @@ $app->post('/register', function(Request $request, Response $response)
 $app->get('/demo',function(Request $request, Response $response,array $args )
 {
     $db = new DbHandler;
-    $db->setUserId(190);
+    $db->setUserId(819);
     // $users = array();
         $responseG = array();
-        $responseG['data'] = $db->getProductById(60);
+        $responseG['data'] = $db->getProductCurrentQuantityById(149);
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
+});
+
+$app->get('/pdf',function(Request $request, Response $response,array $args )
+{
+    include 'invoice.php';
+    $mpdf = new \Mpdf\Mpdf(['orientation' => 'L']);
+    $stylesheet = file_get_contents('css/b.css'); // external css
+    // $stylesheet1 = file_get_contents('css/socialcodia.css'); // external css
+    $mpdf->WriteHTML($stylesheet,1);
+    // $mpdf->WriteHTML($stylesheet1,2);
+    $mpdf->WriteHTML($content,2);
+    echo $content;
+    $mpdf->Output('doc.pdf','');
 });
 
 $app->get('/demo1',function(Request $request, Response $response,array $args )
@@ -129,7 +142,7 @@ $app->post('/login', function(Request $request, Response $response)
     }
 });
 
-$app->post('/update/product',function(Request $request, Response $response)
+$app->post('/product/update',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -157,7 +170,7 @@ $app->post('/update/product',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/product',function(Request $request, Response $response)
+$app->post('/product/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -184,7 +197,7 @@ $app->post('/add/product',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/seller',function(Request $request, Response $response)
+$app->post('/seller/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -235,7 +248,7 @@ $app->get('/sellers',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/brand',function(Request $request, Response $response)
+$app->post('/brand/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -248,6 +261,39 @@ $app->post('/add/brand',function(Request $request, Response $response)
                     return returnException(false,"Brand Added",$response);
                 else
                     return returnException(true,"Failed To Add Brand",$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/invoice/add',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('sellerId'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $sellerId = $requestParameter['sellerId'];
+                if ($db->isSellerExist($sellerId)) 
+                {
+                    if($db->addInvoice($sellerId))
+                    {
+                        $invoice['invoiceNumber'] = $db->getInvoiceNumber();
+                        $resp = array();
+                        $resp['error'] = false;
+                        $resp['message'] = 'Invoice Added';
+                        $resp['invoice'] = $invoice;
+                        $response->write(json_encode($resp));
+                        return $response->withHeader(CT,AJ)
+                                        ->withStatus(200);
+                    }
+                    else
+                        return returnException(true,"Failed To Add Invoice",$response);
+                }
+                else
+                    return returnException(true,"Seller Not Found",$response);
             }
     }
     else
@@ -300,7 +346,7 @@ $app->get('/sales/all',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/brands',function(Request $request, Response $response)
+$app->get('/brands',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -323,7 +369,7 @@ $app->get('/get/brands',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/sizes',function(Request $request, Response $response)
+$app->get('/sizes',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -346,7 +392,7 @@ $app->get('/get/sizes',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/categories',function(Request $request, Response $response)
+$app->get('/categories',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -369,7 +415,7 @@ $app->get('/get/categories',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/locations',function(Request $request, Response $response)
+$app->get('/locations',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -392,7 +438,7 @@ $app->get('/get/locations',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/products',function(Request $request, Response $response)
+$app->get('/products',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -415,7 +461,7 @@ $app->get('/get/products',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/product/{productId}',function(Request $request, Response $response, array $args)
+$app->get('/product/{productId}',function(Request $request, Response $response, array $args)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -440,7 +486,7 @@ $app->get('/get/product/{productId}',function(Request $request, Response $respon
 });
 
 //working not prepared yet
-$app->get('/get/products/records',function(Request $request, Response $response)
+$app->get('/products/records',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -578,7 +624,7 @@ $app->get('/counts/sales/today',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/products/array',function(Request $request, Response $response)
+$app->get('/products/array',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -601,7 +647,7 @@ $app->get('/get/products/array',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/size',function(Request $request, Response $response)
+$app->post('/size/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -630,6 +676,40 @@ $app->post('/product/sell',function(Request $request, Response $response)
                 $requestParameter = $request->getParsedBody();
                 $productId = $requestParameter['productId'];
                 $result = $db->sellProduct($productId);
+                if($result==SELL_PRODUCT)
+                {
+                    $products = $db->getProductById($productId);
+                    $resp = array();
+                    $resp['error'] = false;
+                    $resp['message'] = SELL_PRODUCT;
+                    $resp['product'] = $products;
+                    $response->write(json_encode($resp));
+                    return $response->withHeader(CT,AJ)
+                                    ->withStatus(200);
+                }
+                else if($result==SELL_PRODUCT_FAILED)
+                    return returnException(true,SELL_PRODUCT_FAILED,$response);
+                else if($result==PRODUCT_QUANTITY_LOW)
+                    return returnException(true,PRODUCT_QUANTITY_LOW,$response);
+                else
+                    return returnException(true,SWW,$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/seller/product/sell',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('productId','invoiceNumber'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $productId = $requestParameter['productId'];
+                $invoiceNumber = $requestParameter['invoiceNumber'];
+                $result = $db->sellProductToSeller($productId,$invoiceNumber);
                 if($result==SELL_PRODUCT)
                 {
                     $products = $db->getProductById($productId);
@@ -746,6 +826,30 @@ $app->post('/product/sell/delete',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
+$app->post('/seller/product/sell/delete',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('sellId'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $sellId = $requestParameter['sellId'];
+                $result = $db->deleteSellerSoldProduct($sellId);
+                if($result==SALE_RECORD_DELETED)
+                    return returnException(false,SALE_RECORD_DELETED,$response);
+                else if($result==SALE_RECORD_DELETE_FAILED)
+                    return returnException(true,SALE_RECORD_DELETE_FAILED,$response);
+                else if($result==SALE_NOT_EXIST)
+                    return returnException(true,SALE_NOT_EXIST,$response);
+                else
+                    return returnException(true,SWW,$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
 $app->post('/product/sell/update',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -774,7 +878,36 @@ $app->post('/product/sell/update',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/category',function(Request $request, Response $response)
+$app->post('/seller/product/sell/update',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('saleId','productQuantity','sellDiscount','productSellPrice'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $saleId = $requestParameter['saleId'];
+                $productQuantity = $requestParameter['productQuantity'];
+                $productSellPrice = $requestParameter['productSellPrice'];
+                $sellDiscount = $requestParameter['sellDiscount'];
+                $result = $db->updateSellerSellProducts($saleId,$productQuantity,$sellDiscount,$productSellPrice);
+                if($result == SALE_UPDATED)
+                    return returnException(false,SALE_UPDATED,$response);
+                else if($result == SALE_UPDATE_FAILED)
+                    return returnException(true,SALE_UPDATE_FAILED,$response);
+                else if($result == SALE_NOT_EXIST)
+                    return returnException(true,SALE_NOT_EXIST,$response);
+                else if($result==PRODUCT_QUANTITY_LOW)
+                    return returnException(true,PRODUCT_QUANTITY_LOW,$response);
+                else
+                    return returnException(true,SWW,$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/category/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -793,7 +926,7 @@ $app->post('/add/category',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/location',function(Request $request, Response $response)
+$app->post('/location/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
