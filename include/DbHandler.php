@@ -136,7 +136,7 @@ class DbHandler
             return false;
     }
 
-     function getSellers()
+    function getSellers()
     {
         $sellers = array();
         $query = "SELECT seller_id,seller_fname,seller_lname,seller_email,seller_contact,seller_contact_1,seller_image,seller_address from sellers ORDER BY seller_id ASC";
@@ -200,6 +200,21 @@ class DbHandler
             return false;
     }
 
+    function isInvoiceExist($invoiceNumber)
+    {
+        $sellers = array();
+        $query = "SELECT invoice_id FROM invoices WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($iId);
+        $stmt->fetch();
+        if (!empty($iId))
+            return true;
+        else
+            return false;
+    }
+
     function uploadImage($image)
     {
         $imageUrl ="";
@@ -250,6 +265,63 @@ class DbHandler
         $invoiceNumber = (int) substr($invoiceNumber,3, 10)+1;
         $invoiceNumber = $companyTag.$invoiceNumber;
         return $invoiceNumber;
+    }
+
+    function addPayment($sellerId,$invoiceNumber,$paymentAmount)
+    {
+        $tokenId = $this->getUserId();
+        date_default_timezone_set('Asia/Kolkata');
+        $paymentMode = 'CASH';
+        $date = date('y/m/d', time());
+        $query = "INSERT INTO payments (payment_mode,payment_date,payment_amount,payment_receiver,invoice_number,seller_id) VALUES(?,?,?,?,?,?)";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param("ssssss",$paymentMode,$date,$paymentAmount,$tokenId,$invoiceNumber,$sellerId);
+        if ($stmt->execute())
+            return true;
+        else
+            return false;
+    }
+
+    function isPaymentAmountLessThanInvoiceAmount($invoiceNumber,$paymentAmount)
+    {
+        $invoiceAmount = (int) $this->getTotalAmountByInvoiceNumber($invoiceNumber);
+        $paymentAmount = (int) $paymentAmount;
+        $paidAmount = (int) $this->getAllPaidAmountByInvoiceNumber($invoiceNumber);
+        if ($invoiceAmount-$paidAmount-$paymentAmount>=0)
+        {
+            return true;
+        }
+        else
+            return false;
+    }
+
+    function getAllPaidAmountByInvoiceNumber($invoiceNumber)
+    {
+        $query = "SELECT SUM(payment_amount) FROM payments WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($totalAmount);
+        $stmt->fetch();
+        return $totalAmount;
+    }
+
+    function getTotalAmountByInvoiceNumber($invoiceNumber)
+    {
+        $query = "SELECT SUM(sell_price) FROM sellers_sells WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($totalAmount);
+        $stmt->fetch();
+        return $totalAmount;
+    }
+
+    function getCurrentAmountOfInvoiceByInvoiceNumber($invoiceNumber)
+    {
+        $paidAmount = (int) $this->getAllPaidAmountByInvoiceNumber($invoiceNumber);
+        $invoiceAmount = (int) $this->getTotalAmountByInvoiceNumber($invoiceNumber);
+        return $invoiceAmount-$paidAmount;
     }
 
     function addInvoice($sellerId)
@@ -375,6 +447,57 @@ class DbHandler
         $stmt->execute();
         $stmt->store_result();
         if ($stmt->num_rows()>0)
+            return true;
+        else
+            return false;
+    }
+
+    function getInvoiceByInvoiceNumber($invoiceNumber)
+    {
+        $invoice = array();
+        $invoices = array();
+        $invoicess = array();
+        $pro = array();
+        if (!$this->isInvoiceExist($invoiceNumber))
+           return $pro;
+        $query = "SELECT invoice_id,invoice_number,seller_id,invoice_date FROM invoices WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($invoiceId,$invoiceNumber,$sellerId,$invoiceDate);
+        $stmt->fetch();
+        $invoice['invoiceId']           = $invoiceId;
+        $invoice['invoiceNumber']       = $invoiceNumber;
+        $invoice['sellerId']            = $sellerId;
+        $invoice['invoiceDate']         = $invoiceDate;
+        array_push($invoices, $invoice);
+        $stmt->close();
+        foreach ($invoices as  $invoice)
+        {
+            $inv['invoiceId']               = $invoice['invoiceId'];
+            $inv['invoiceNumber']           = $invoice['invoiceNumber'];
+            $inv['invoiceDate']             = $invoice['invoiceDate'];
+            $inv['invoiceAmount']           = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoicePaidAmount']       = $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoiceStatus']           = $this->isInvoicePaid($inv['invoiceNumber']);
+            $inv['seller']                  = $this->getSellerById($invoice['sellerId']);
+        }
+        return $inv;
+    }
+
+    function isInvoicePaid($invoiceNumber)
+    {
+        if ($this->getInvoiceStatus($invoiceNumber))
+            return 'PAID';
+        else
+            return 'UNPAID';
+    }
+
+    function getInvoiceStatus($invoiceNumber)
+    {
+        $invoiceAmount = (int) $this->getTotalAmountByInvoiceNumber($invoiceNumber);
+        $paidAmount = (int) $this->getAllPaidAmountByInvoiceNumber($invoiceNumber);
+        if ($invoiceAmount-$paidAmount==0)
             return true;
         else
             return false;
@@ -689,6 +812,63 @@ class DbHandler
         }
         return $pr;
     }
+
+    function getInvoices()
+    {
+        $invoice = array();
+        $invoices = array();
+        $invoicess = array();
+        $seller = array();
+        $pro = array();
+        $query = "SELECT invoice_id,invoice_number,seller_id,invoice_date FROM invoices";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();
+        $stmt->bind_result($invoiceId,$invoiceNumber,$sellerId,$invoiceDate);
+        while($stmt->fetch())
+        {
+            $invoice['invoiceId']           = $invoiceId;
+            $invoice['invoiceNumber']       = $invoiceNumber;
+            $invoice['sellerId']            = $sellerId;
+            $invoice['invoiceDate']         = $invoiceDate;
+            array_push($invoices, $invoice);
+        }
+        $stmt->close();
+        foreach ($invoices as  $invoice)
+        {
+            $seller                         = $this->getSellerById($invoice['sellerId']);
+            $seller                         = $seller[0];
+            $inv['invoiceId']               = $invoice['invoiceId'];
+            $inv['invoiceNumber']           = $invoice['invoiceNumber'];
+            $inv['invoiceDate']             = $invoice['invoiceDate'];
+            $inv['invoiceAmount']           = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoicePaidAmount']       = $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoiceStatus']           = $this->isInvoicePaid($inv['invoiceNumber']);
+            $inv['sellerName']              = $seller['sellerFirstName'].' '.$seller['sellerLastName'];
+            $inv['sellerImage']             = $seller['sellerImage'];
+            $inv['sellerContactNumber']     = $seller['sellerContactNumber'];
+            $inv['sellerContactNumber1']    = $seller['sellerContactNumber1'];
+            $inv['sellerAddress']           = $seller['sellerAddress'];
+            array_push($invoicess, $inv);
+        }
+        return $invoicess;
+    }
+
+
+    // function getSalesCountByProductId($productId)
+    // {
+    //     $productQuantity = 0;
+    //     $query = "SELECT sell_quantity FROM sells WHERE product_id=?";
+    //     $stmt = $this->con->prepare($query);
+    //     $stmt->bind_param('s',$productId);
+    //     $stmt->execute();
+    //     $stmt->bind_result($quantity);
+    //     while ($stmt->fetch())
+    //     {
+    //         $productQuantity = $productQuantity+$quantity;
+    //     }
+    //     return $productQuantity;
+    // }
+
 
     function getSalesCountByProductId($productId)
     {

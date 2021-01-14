@@ -67,7 +67,7 @@ $app->get('/demo',function(Request $request, Response $response,array $args )
     $db->setUserId(819);
     // $users = array();
         $responseG = array();
-        $responseG['data'] = $db->getProductCurrentQuantityById(149);
+        $responseG['data'] = $db->getInvoiceByInvoiceNumber('FHC10002');
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -95,7 +95,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->getSalesCountByProductId(89);
+        $responseG['data'] = $db->getInvoices();
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -267,6 +267,51 @@ $app->post('/brand/add',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
+$app->post('/payment/add',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('sellerId','invoiceNumber','paymentAmount'),$request,$response))
+        {
+            $requestParameter = $request->getParsedBody();
+            $sellerId = $requestParameter['sellerId'];
+            $invoiceNumber = $requestParameter['invoiceNumber'];
+            $paymentAmount = (int) $requestParameter['paymentAmount'];
+            if ($paymentAmount<=0)
+                return returnException(true,"Please Increase The Payment Amount",$response);
+            if ($db->isSellerExist($sellerId)) 
+            {
+                if ($db->isInvoiceExist($invoiceNumber)) 
+                {
+                    if ($db->isPaymentAmountLessThanInvoiceAmount($invoiceNumber,$paymentAmount))
+                    {
+                        if($db->addPayment($sellerId,$invoiceNumber,$paymentAmount))
+                        {
+                            $resp = array();
+                            $resp['error'] = false;
+                            $resp['message'] = 'Payment Success';
+                            $response->write(json_encode($resp));
+                            return $response->withHeader(CT,AJ)
+                                            ->withStatus(200);
+                        }
+                        else
+                            return returnException(true,"Payment Failed",$response);
+                    }
+                    else
+                        return returnException(true,"Amount Could Not Be Greater Than Invoice Amount",$response);
+                }
+                else
+                    return returnException(true,"No Invoice Found",$response);
+            }
+            else
+                return returnException(true,"Seller Not Found",$response);
+        }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
 $app->post('/invoice/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -295,6 +340,29 @@ $app->post('/invoice/add',function(Request $request, Response $response)
                 else
                     return returnException(true,"Seller Not Found",$response);
             }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/invoices',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $invoices = $db->getInvoices();
+        if(!empty($invoices))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "invoices List Found";
+            $resp['invoices'] = $invoices;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Sales Record Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
