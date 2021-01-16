@@ -8,7 +8,7 @@ define('DB_USER', 'root');          //your database name
 define('DB_PASS', '');              //your database password
 define('DB_HOST', 'localhost');     //your database host name
 
-define('WEBSITE_DOMAIN', 'http://socialcodia.net/azmiunanistore/public/');
+define('WEBSITE_DOMAIN', 'http://socialcodia.net/azmiunanistorepdf/public/');
 define('WEBSITE_EMAIL', 'socialcodia@gmail.com');                    //your email address
 define('WEBSITE_EMAIL_PASSWORD', 'PASSWORD');                        //your email password
 define('WEBSITE_EMAIL_FROM', 'Social Codia');                        // your website name here

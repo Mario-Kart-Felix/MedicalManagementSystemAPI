@@ -215,6 +215,18 @@ class DbHandler
             return false;
     }
 
+    function getInvoiceUrlByInvoiceNumber($invoiceNumber)
+    {
+        $sellers = array();
+        $query = "SELECT invoice_url FROM invoices WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($invoiceUrl);
+        $stmt->fetch();
+        return $invoiceUrl;
+    }
+
     function uploadImage($image)
     {
         $imageUrl ="";
@@ -315,6 +327,19 @@ class DbHandler
         $stmt->bind_result($totalAmount);
         $stmt->fetch();
         return $totalAmount;
+    }
+
+    //CAFUSION : This function is not completed yet, We are not using this funtion to anywhere
+    function getTotalOrignalAmountByInvoiceNumber($invoiceNumber)
+    {
+        $productIds = $this->getAllProductIdAndSellQuantityByInvoiceNumber($invoiceNumber);
+        $query = "SELECT SUM(sell_price) FROM sellers_sells WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($totalAmount);
+        $stmt->fetch();
+        return $productIds;
     }
 
     function getCurrentAmountOfInvoiceByInvoiceNumber($invoiceNumber)
@@ -474,15 +499,120 @@ class DbHandler
         $stmt->close();
         foreach ($invoices as  $invoice)
         {
+            $paidAmount                     = $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $seller                         = $this->getSellerById($invoice['sellerId']);
+            $seller                         = $seller[0];
+            $sellerImage                    = $seller['sellerImage'];
+            if (empty($sellerImage))
+                $sellerImage = WEBSITE_DOMAIN.'uploads/api/user.png';
+            if (empty($paidAmount))
+                $paidAmount = 0;
             $inv['invoiceId']               = $invoice['invoiceId'];
             $inv['invoiceNumber']           = $invoice['invoiceNumber'];
             $inv['invoiceDate']             = $invoice['invoiceDate'];
             $inv['invoiceAmount']           = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']);
-            $inv['invoicePaidAmount']       = $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoiceTotalPrice']       = $this->getTotalPriceOfInvoiceByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoicePaidAmount']       = $paidAmount;
             $inv['invoiceStatus']           = $this->isInvoicePaid($inv['invoiceNumber']);
-            $inv['seller']                  = $this->getSellerById($invoice['sellerId']);
+            $inv['sellerName']              = $seller['sellerFirstName'].' '.$seller['sellerLastName'];
+            
+            $inv['sellerImage']             = $sellerImage;
+            $inv['sellerId']     = $seller['sellerId'];
+            $inv['sellerContactNumber']     = $seller['sellerContactNumber'];
+            $inv['sellerContactNumber1']    = $seller['sellerContactNumber1'];
+            $inv['sellerAddress']           = $seller['sellerAddress'];
         }
         return $inv;
+    }
+
+
+    function getSellerSellProductsByInvoiceNumber($invoiceNumber)
+    {
+        $products = array();
+        $productss = array();
+        $query = "SELECT product_id, sell_quantity, sell_discount, sell_price FROM sellers_sells WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($productId,$sellQuantity,$sellDiscount,$sellPrice);
+        while ($stmt->fetch())
+        {
+            $product['productId'] = $productId;
+            $product['sellQuantity'] = $sellQuantity;
+            $product['sellDiscount'] = $sellDiscount;
+            $product['sellPrice'] = $sellPrice;
+            array_push($products, $product);
+        }
+        $stmt->close();
+        foreach ($products as $product)
+        {
+            $pro = $this->getProductById($product['productId']);
+            $pro['productId']       = $product['productId'];
+            $pro['sellQuantity']    = $product['sellQuantity'];
+            $pro['sellDiscount']    = $product['sellDiscount'];
+            $pro['sellPrice']       = $product['sellPrice'];
+            array_push($productss, $pro);
+        }
+        return $productss;
+    }
+
+    function setInvoiceUrlByInvoiceNumber($invoiceUrl,$invoiceNumber)
+    {
+        $query = "UPDATE invoices SET invoice_url=? WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('ss',$invoiceUrl,$invoiceNumber);
+        if($stmt->execute())
+            return true;
+        else
+            return false;
+
+    }
+
+    // Working on this one function or from this ones function ok, first need to fetch the full details item of a product which is sold
+    // whihch information should we have to return we will return it ok,
+    function getInvoiceProductsByInvoiceNumber($invoiceNumber)
+    {
+        $products = array();
+        $idAndQuantityArray = $this->getAllProductIdAndSellQuantityByInvoiceNumber($invoiceNumber);
+        foreach ($idAndQuantityArray as $idSelQuan)
+        {
+            $productss = $this->getProductById($idSelQuan['productId']);
+            $product['productName'] = $productss['productName'];
+            $product['productSize'] = $productss['productSize'];
+            $product['productPrice'] = $productss['productPrice'];
+            $product['sellQuantity'] = $idSelQuan['sellQuantity'];
+            $product['productTotalPrice'] = $productss['productPrice']*$idSelQuan['sellQuantity'];
+            $product['productDiscount']   = $this->getAllProductIdAndSellQuantityByInvoiceNumber($productss['productId'],$invoiceNumber);
+            // $product['productSellPrice']  = $this->decPercentage()
+            array_push($products, $product);
+        }
+        return $products;
+    }
+
+    function getProductSellPercentageByProductIdAndInvoiceNumber($productId,$invoiceNumber)
+    {
+        $query = "SELECT sell_discount FROM sellers_sells WHERE product_id=? AND invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('ss',$productId,$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($sellPercentage);
+        $stmt->fetch();
+        return $sellPercentage;
+    }
+
+    function getPercentage($value,$values)
+    {
+        return 100 - ($value / $values) * 100;
+    }
+
+    function decPercentage($percent,$value)
+    {
+        return $value - ($percent / 100) * $value;
+    }
+
+    function getInvoicePDFByInvoiceNumber($invoiceNumber)
+    {
+        $invoice = $this->getInvoiceByInvoiceNumber($invoiceNumber);
     }
 
     function isInvoicePaid($invoiceNumber)
@@ -1294,6 +1424,34 @@ class DbHandler
         $stmt->execute();
         $stmt->bind_result($productPrice);
         $stmt->fetch();
+        return $productPrice;
+    }
+
+    function getAllProductIdAndSellQuantityByInvoiceNumber($invoiceNumber)
+    {
+        $details = array();
+        $query = "SELECT product_id,sell_quantity FROM sellers_sells WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($productId,$sellQuantity);
+        while($stmt->fetch())
+        {
+            $result['productId'] = $productId;
+            $result['sellQuantity'] = $sellQuantity;
+            array_push($details, $result);
+        }
+        return $details;
+    }
+
+    function getTotalPriceOfInvoiceByInvoiceNumber($invoiceNumber)
+    {
+        $productPrice = 0;
+        $details = $this->getAllProductIdAndSellQuantityByInvoiceNumber($invoiceNumber);   
+        foreach ($details as $det)
+        {
+            $productPrice = $productPrice+ $this->getProductPriceById($det['productId'])*$det['sellQuantity'];
+        }
         return $productPrice;
     }
 

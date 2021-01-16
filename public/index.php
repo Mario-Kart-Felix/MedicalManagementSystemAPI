@@ -67,7 +67,7 @@ $app->get('/demo',function(Request $request, Response $response,array $args )
     $db->setUserId(819);
     // $users = array();
         $responseG = array();
-        $responseG['data'] = $db->getInvoiceByInvoiceNumber('FHC10002');
+        $responseG['data'] = $db->getSellerSellProductsByInvoiceNumber('FHC10006');
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -368,6 +368,93 @@ $app->get('/invoices',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
+$app->get('/invoice/{invoiceNumber}/pdf',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    // if (validateToken($db,$request,$response)) 
+    // {
+        $invoiceNumber = $args['invoiceNumber'];
+        if ($db->isInvoiceExist($invoiceNumber))
+        {
+            $invoice = $db->getInvoiceByInvoiceNumber($invoiceNumber);
+            if(!empty($invoice))
+            {
+                $invoiceUrl = $db->getInvoiceUrlByInvoiceNumber($invoiceNumber);
+                if(empty($invoiceUrl))
+                {
+                    $invoice = makeInvoice($db,$invoice);
+                    $mpdf = new \Mpdf\Mpdf(['orientation' => 'L']);
+                    $stylesheet = file_get_contents('css/b.css'); // external css
+                    // $stylesheet1 = file_get_contents('css/socialcodia.css'); // external css
+                    $mpdf->WriteHTML($stylesheet,1);
+                    // $mpdf->WriteHTML($stylesheet1,2);
+                    $mpdf->WriteHTML($invoice,2);
+                    $randNumber = rand(10000000,99999999999);
+                    $invoicePDF = 'uploads/invoices/'.$invoiceNumber.$randNumber.'.pdf';
+                    $mpdf->Output($invoicePDF,'');
+                    if($db->setInvoiceUrlByInvoiceNumber($invoicePDF,$invoiceNumber))
+                    {
+                        $inv['invoiceUrl'] = WEBSITE_DOMAIN.$invoicePDF;
+                        $resp = array();
+                        $resp['error'] = false;
+                        $resp['message'] = "New Invoice Found";
+                        $resp['invoice'] = $inv;
+                        $response->write(json_encode($resp));
+                        return $response->withHeader(CT,AJ)
+                                        ->withStatus(200);
+                    }
+                }
+                else
+                {
+                    $inv['invoiceUrl'] = WEBSITE_DOMAIN.$invoiceUrl;
+                    $resp = array();
+                    $resp['error'] = false;
+                    $resp['message'] = "Invoice Found";
+                    $resp['invoice'] = $inv;
+                    $response->write(json_encode($resp));
+                    return $response->withHeader(CT,AJ)
+                                    ->withStatus(200);
+                }
+            }
+            else
+                return returnException(true,"Invoice Not Found",$response);
+        }
+        else
+            return returnException(true,"Invoice Not Found",$response);
+    // }
+    // else
+        // return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/invoice/{invoiceNumber}',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $invoiceNumber = $args['invoiceNumber'];
+        if ($db->isInvoiceExist($invoiceNumber))
+        {
+            $invoice = $db->getInvoiceByInvoiceNumber($invoiceNumber);
+            if(!empty($invoice))
+            {
+                $resp = array();
+                $resp['error'] = false;
+                $resp['message'] = "Invoice Found";
+                $resp['invoice'] = $invoice;
+                $response->write(json_encode($resp));
+                return $response->withHeader(CT,AJ)
+                                ->withStatus(200);
+            }
+            else
+                return returnException(true,"Invoice Not Found",$response);
+        }
+        else
+            return returnException(true,"Invoice Not Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
 $app->get('/sales/today',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -553,7 +640,6 @@ $app->get('/product/{productId}',function(Request $request, Response $response, 
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-//working not prepared yet
 $app->get('/products/records',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -1030,6 +1116,178 @@ function checkEmptyParameter($requiredParameter,$request,$response)
     if($error)
         return returnException(true,"Required Parameter ".substr($errorParam,0,-2)." is missing",$response);
     return $error;
+}
+
+function makeInvoice($db,$invoiceInfo)
+{
+    $fullInvoiceHTMl = null;
+
+    $count = 0;
+    $companyName = 'FAROOQUI HERBAL CO.';
+    $companyEmail = 'farooquiherbal@gmail.com';
+    $companyNumber = '+91 9920464508';
+    $companyAddress = 'Nadkar Complex, Tanwar Nagar, Kausa, Mumbra';
+    $invoiceNumber = $invoiceInfo['invoiceNumber'];
+    $invoiceDate = $invoiceInfo['invoiceDate'];
+    $invoiceAmount = $invoiceInfo['invoiceAmount'];
+    $sellerName = $invoiceInfo['sellerName'];
+    $sellerImage = $invoiceInfo['sellerImage'];
+    $sellerNumber = $invoiceInfo['sellerContactNumber'];
+    $sellerAddress = $invoiceInfo['sellerAddress'];
+    $priceAllTotalAmount = $invoiceInfo['invoiceTotalPrice'];
+    $priceAllDiscountAmount = $invoiceInfo['invoiceAmount'];
+    $invoiceHeader = getInvoiceHeader($sellerImage,$companyName,$companyNumber,$companyEmail,$companyAddress,$sellerName,$sellerNumber,$sellerAddress,$invoiceNumber);
+    $fullInvoiceHTMl .= $invoiceHeader;
+    $products = $db->getSellerSellProductsByInvoiceNumber($invoiceInfo['invoiceNumber']);
+    
+    foreach ($products as $product)
+    {
+        $productName = $product['productName'];
+        $productSize = $product['productSize'];
+        $productPrice = $product['productPrice'];
+        $sellQuantity = $product['sellQuantity'];
+        $productTotalPrice = $product['productPrice']*$product['sellQuantity'];
+        $sellDiscount = $product['sellDiscount'].'%';
+        $sellPrice = $product['sellPrice'];
+        $count++;
+
+        $invoiceBody = <<<HERE
+        <tr>
+        <td class="col-md-1">$count</td>
+        <td class="col-md-9  col-xs-3">$productName</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$productSize</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$productPrice</td>
+        <td class="col-md-1 "><i class="fa fa-inr"></i>$sellQuantity</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$productTotalPrice</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$sellDiscount</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$sellPrice</td>
+    </tr>
+    HERE;
+    $fullInvoiceHTMl .=$invoiceBody;
+    }
+
+    $invoiceFooter = getInvoiceFooter($priceAllTotalAmount,$priceAllDiscountAmount,$invoiceDate);
+    $fullInvoiceHTMl .=$invoiceFooter;
+    return $fullInvoiceHTMl;
+}
+
+function getInvoiceHeader($sellerImage,$companyName,$companyNumber,$companyEmail,$companyAddress,$sellerName,$sellerNumber,$sellerAddress,$invoiceNumber)
+{
+    $invoiceHeader = <<<HERE
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="../../../css/b.css" rel="stylesheet">
+        </head>
+        <body>
+        <div class="col-md-12">   
+        <div class="row">
+        <div class="receipt-main">
+        <div class="row">
+        <div class="receipt-header">
+        <div class="col-xs-7 col-sm-7 col-md-7">
+        <div class="receipt-left">
+        <img class="img-responsive" alt="sellerimage" src="$sellerImage" style="width: 71px; border-radius: 43px; border-radius:50%">
+        </div>
+        </div>
+        <div class="col-xs-4 col-sm-4 col-md-4 text-right">
+        <div class="receipt-right">
+        <h5>$companyName</h5>
+        <p>+91 $companyNumber<i class="fa fa-phone"></i></p>
+        <p>$companyEmail<i class="fa fa-envelope-o"></i></p>
+        <p>$companyAddress<i class="fa fa-location-arrow"></i></p>
+        </div>
+        </div>
+        </div>
+        </div>
+        <div class="row">
+        <div class="receipt-header receipt-header-mid">
+        <div class="col-xs-8 col-sm-8 col-md-8 text-left">
+        <div class="receipt-right">
+        <h5>$sellerName</h5>
+        <p><b>Mobile :</b> +91 $sellerNumber</p>
+        <p><b>Address :</b> $sellerAddress</p>
+        </div>
+        </div>
+        <div class="col-xs-3 col-sm-3 col-md-3">
+        <div class="receipt-left">
+        <h3>INVOICE # $invoiceNumber</h3>
+        </div>
+        </div>
+        </div>
+        </div>
+        <div>
+        <table class="table table-bordered">
+        <thead>
+        <tr>
+        <th>Sr. No</th>
+        <th>Products</th>
+        <th>Size</th>
+        <th>Price</th>
+        <th>Quantity</th>
+        <th>Total</th>
+        <th>Discount</th>
+        <th>Amount</th>
+        </tr>
+        </thead>
+        <tbody>
+        HERE;
+return $invoiceHeader;
+}
+
+function getInvoiceFooter($priceAllTotalAmount,$priceAllDiscountAmount,$invoiceDate)
+{
+    $invoiceHeader = <<<HERE
+                  <tr>
+                  <td></td>
+                  <td class="text-right">
+                  <h2>
+                  <strong>Total: </strong>
+                  </h2>
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td class="text-left text-danger">
+                  <h2>
+                  <strong><i class="fa fa-inr"></i> $priceAllTotalAmount</strong>
+                  </h2>
+                  </td>
+                  <td></td>
+                  <td class="text-left text-danger">
+                  <h2>
+                  <strong><i class="fa fa-inr"></i> $priceAllDiscountAmount</strong>
+                  </h2>
+                  </td>
+                  </tr>
+                  </tbody>
+                  </table>
+                  </div>
+                  <div class="row">
+                  <div class="receipt-header receipt-header-mid receipt-footer">
+                  <div class="col-xs-8 col-sm-8 col-md-8 text-left">
+                  <div class="receipt-right">
+                  <p><b>Date :</b> $invoiceDate</p>
+                  <h5 style="color: rgb(140, 140, 140);">Thanks for shopping.!</h5>
+                  </div>
+                  </div>
+                  <div class="col-xs-2 col-sm-2 col-md-2">
+                  <div class="receipt-left">
+                  <h1>Signature</h1>
+                  </div>
+                  </div>
+                  </div>
+                  </div>
+                  </div>    
+                  </div>
+                  </div>
+                  </script>
+                  </body>
+                  </html>
+        HERE;
+return $invoiceHeader;
 }
 
 /*
