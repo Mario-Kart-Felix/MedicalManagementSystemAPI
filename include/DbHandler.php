@@ -284,7 +284,7 @@ class DbHandler
         $tokenId = $this->getUserId();
         date_default_timezone_set('Asia/Kolkata');
         $paymentMode = 'CASH';
-        $date = date('y/m/d', time());
+        $date = date('y/m/d H:i:s', time());
         $query = "INSERT INTO payments (payment_mode,payment_date,payment_amount,payment_receiver,invoice_number,seller_id) VALUES(?,?,?,?,?,?)";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param("ssssss",$paymentMode,$date,$paymentAmount,$tokenId,$invoiceNumber,$sellerId);
@@ -499,7 +499,8 @@ class DbHandler
         $stmt->close();
         foreach ($invoices as  $invoice)
         {
-            $paidAmount                     = $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $paidAmount                     = (int) $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $invoiceRemainingAmount         = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']) - (int) $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
             $seller                         = $this->getSellerById($invoice['sellerId']);
             $seller                         = $seller[0];
             $sellerImage                    = $seller['sellerImage'];
@@ -507,12 +508,15 @@ class DbHandler
                 $sellerImage = WEBSITE_DOMAIN.'uploads/api/user.png';
             if (empty($paidAmount))
                 $paidAmount = 0;
+            if (empty($invoiceRemainingAmount ))
+                $invoiceRemainingAmount  = 0;
             $inv['invoiceId']               = $invoice['invoiceId'];
             $inv['invoiceNumber']           = $invoice['invoiceNumber'];
             $inv['invoiceDate']             = $invoice['invoiceDate'];
             $inv['invoiceAmount']           = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']);
             $inv['invoiceTotalPrice']       = $this->getTotalPriceOfInvoiceByInvoiceNumber($invoice['invoiceNumber']);
             $inv['invoicePaidAmount']       = $paidAmount;
+            $inv['invoiceRemainingAmount']  = $invoiceRemainingAmount;
             $inv['invoiceStatus']           = $this->isInvoicePaid($inv['invoiceNumber']);
             $inv['sellerName']              = $seller['sellerFirstName'].' '.$seller['sellerLastName'];
             
@@ -524,6 +528,40 @@ class DbHandler
         }
         return $inv;
     }
+
+    function getPaymentsByInvoiceNumber($invoiceNumber)
+    {
+        $invoice = array();
+        $payments = array();
+        $paymentss = array();
+        $pro = array();
+        $query = "SELECT payment_id,payment_date,payment_amount,invoice_number,seller_id FROM payments WHERE invoice_number=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$invoiceNumber);
+        $stmt->execute();
+        $stmt->bind_result($paymentId,$paymentDate,$paymentAmount,$invoiceNumber,$sellerId);
+        while($stmt->fetch())
+        {
+            $payment['paymentId']       = $paymentId;
+            $payment['paymentDate']     = $paymentDate;
+            $payment['paymentAmount']   = $paymentAmount;
+            $payment['invoiceNumber']   = $invoiceNumber;
+            $payment['sellerId']        = $sellerId;
+            array_push($payments, $payment);
+        }
+        $stmt->close();
+        foreach ($payments as  $payment)
+        {
+            $pay['paymentId']               = $payment['paymentId'];
+            $pay['invoiceNumber']           = $payment['invoiceNumber'];
+            $pay['paymentDate']             = $payment['paymentDate'];
+            $pay['paymentAmount']           = $payment['paymentAmount'];
+            $pay['sellerId']                = $payment['sellerId'];
+            array_push($paymentss, $pay);
+        }
+        return $paymentss;
+    }
+
 
 
     function getSellerSellProductsByInvoiceNumber($invoiceNumber)
@@ -862,7 +900,7 @@ class DbHandler
     function getBrands()
     {
         $brands = array();
-        $query = "SELECT brand_id,brand_name FROM brands";
+        $query = "SELECT brand_id,brand_name FROM brands ORDER BY brand_name ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($brandId,$brandName);
@@ -878,7 +916,7 @@ class DbHandler
     function getSizes()
     {
         $sizes = array();
-        $query = "SELECT size_id,size_name FROM sizes";
+        $query = "SELECT size_id,size_name FROM sizes ORDER BY size_name ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($sizeId,$sizeName);
@@ -894,7 +932,7 @@ class DbHandler
     function getCategories()
     {
         $categories = array();
-        $query = "SELECT category_id,category_name FROM categories";
+        $query = "SELECT category_id,category_name FROM categories ORDER BY category_name ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($categoryId,$categoryName);
@@ -972,6 +1010,7 @@ class DbHandler
             $inv['invoiceDate']             = $invoice['invoiceDate'];
             $inv['invoiceAmount']           = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']);
             $inv['invoicePaidAmount']       = $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoiceRemainingAmount']  = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']) - $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
             $inv['invoiceStatus']           = $this->isInvoicePaid($inv['invoiceNumber']);
             $inv['sellerName']              = $seller['sellerFirstName'].' '.$seller['sellerLastName'];
             $inv['sellerImage']             = $seller['sellerImage'];
@@ -982,23 +1021,6 @@ class DbHandler
         }
         return $invoicess;
     }
-
-
-    // function getSalesCountByProductId($productId)
-    // {
-    //     $productQuantity = 0;
-    //     $query = "SELECT sell_quantity FROM sells WHERE product_id=?";
-    //     $stmt = $this->con->prepare($query);
-    //     $stmt->bind_param('s',$productId);
-    //     $stmt->execute();
-    //     $stmt->bind_result($quantity);
-    //     while ($stmt->fetch())
-    //     {
-    //         $productQuantity = $productQuantity+$quantity;
-    //     }
-    //     return $productQuantity;
-    // }
-
 
     function getSalesCountByProductId($productId)
     {
@@ -1069,7 +1091,7 @@ class DbHandler
     function getLocations()
     {
         $locations = array();
-        $query = "SELECT location_id,location_name FROM locations";
+        $query = "SELECT location_id,location_name FROM locations ORDER BY location_name ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($locationId,$locationName);

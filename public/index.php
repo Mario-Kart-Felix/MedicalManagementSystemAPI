@@ -67,7 +67,7 @@ $app->get('/demo',function(Request $request, Response $response,array $args )
     $db->setUserId(819);
     // $users = array();
         $responseG = array();
-        $responseG['data'] = $db->getSellerSellProductsByInvoiceNumber('FHC10006');
+        $responseG['data'] = $db->getInvoiceByInvoiceNumber('FHC10002');
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -95,7 +95,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->getInvoices();
+        $responseG['data'] = $db->sellProductToSeller('165','FHC10006');
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -188,9 +188,9 @@ $app->post('/product/add',function(Request $request, Response $response)
                 $productManufactureDate = $requestParameter['productManufactureDate'];
                 $productExpireDate = $requestParameter['productExpireDate'];
                 if($db->addProduct($productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate))
-                    return returnException(false,"Product Added",$response);
+                    return returnException(false,PRODUCT_ADDED,$response);
                 else
-                    return returnException(true,"Failed To Add Product",$response);
+                    return returnException(true,PRODUCT_ADDED_FAILED,$response);
             }
     }
     else
@@ -216,9 +216,9 @@ $app->post('/seller/add',function(Request $request, Response $response)
                 $sellerContactNumber1 = $requestParameter['sellerContactNumber1'];
                 $sellerAddress = $requestParameter['sellerAddress'];
                 if($db->addSeller($sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress))
-                    return returnException(false,"Seller Information Added",$response);
+                    return returnException(false,SELLER_INFORMATION_ADDED,$response);
                 else
-                    return returnException(true,"Failed To Add Seller Information",$response);
+                    return returnException(true,SELLER_INFORMATION_ADD_FAILED,$response);
             }
     }
     else
@@ -235,14 +235,14 @@ $app->get('/sellers',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "Sellers List Found";
+            $resp['message'] = SELLER_LIST_FOUND;
             $resp['sellers'] = $sellers;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Seller Found",$response);
+            return returnException(true,SELLER_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -258,9 +258,9 @@ $app->post('/brand/add',function(Request $request, Response $response)
                 $requestParameter = $request->getParsedBody();
                 $brandName = $requestParameter['brandName'];
                 if($db->addBrand($brandName))
-                    return returnException(false,"Brand Added",$response);
+                    return returnException(false,BRAND_ADDED,$response);
                 else
-                    return returnException(true,"Failed To Add Brand",$response);
+                    return returnException(true,BRAND_ADD_FAILED,$response);
             }
     }
     else
@@ -279,7 +279,7 @@ $app->post('/payment/add',function(Request $request, Response $response)
             $invoiceNumber = $requestParameter['invoiceNumber'];
             $paymentAmount = (int) $requestParameter['paymentAmount'];
             if ($paymentAmount<=0)
-                return returnException(true,"Please Increase The Payment Amount",$response);
+                return returnException(true,PAYMENT_AMOUNT_INCREASE,$response);
             if ($db->isSellerExist($sellerId)) 
             {
                 if ($db->isInvoiceExist($invoiceNumber)) 
@@ -296,16 +296,16 @@ $app->post('/payment/add',function(Request $request, Response $response)
                                             ->withStatus(200);
                         }
                         else
-                            return returnException(true,"Payment Failed",$response);
+                            return returnException(true,PAYMENT_FAILED,$response);
                     }
                     else
-                        return returnException(true,"Amount Could Not Be Greater Than Invoice Amount",$response);
+                        return returnException(true,PAYMENT_AMOUNT_GREATER,$response);
                 }
                 else
-                    return returnException(true,"No Invoice Found",$response);
+                    return returnException(true,INVOICE_NOT_FOUND,$response);
             }
             else
-                return returnException(true,"Seller Not Found",$response);
+                return returnException(true,SELLER_NOT_FOUND,$response);
         }
     }
     else
@@ -328,17 +328,17 @@ $app->post('/invoice/add',function(Request $request, Response $response)
                         $invoice['invoiceNumber'] = $db->getInvoiceNumber();
                         $resp = array();
                         $resp['error'] = false;
-                        $resp['message'] = 'Invoice Added';
+                        $resp['message'] = INVOICE_ADDED;
                         $resp['invoice'] = $invoice;
                         $response->write(json_encode($resp));
                         return $response->withHeader(CT,AJ)
                                         ->withStatus(200);
                     }
                     else
-                        return returnException(true,"Failed To Add Invoice",$response);
+                        return returnException(true,INVOICE_ADD_FAILED,$response);
                 }
                 else
-                    return returnException(true,"Seller Not Found",$response);
+                    return returnException(true,SELLER_NOT_FOUND,$response);
             }
     }
     else
@@ -355,14 +355,14 @@ $app->get('/invoices',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "invoices List Found";
+            $resp['message'] = INVOICE_LIST_FOUND;
             $resp['invoices'] = $invoices;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Sales Record Found",$response);
+            return returnException(true,SALES_RECORD_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -371,8 +371,8 @@ $app->get('/invoices',function(Request $request, Response $response)
 $app->get('/invoice/{invoiceNumber}/pdf',function(Request $request, Response $response, array $args)
 {
     $db = new DbHandler;
-    // if (validateToken($db,$request,$response)) 
-    // {
+    if (validateToken($db,$request,$response)) 
+    {
         $invoiceNumber = $args['invoiceNumber'];
         if ($db->isInvoiceExist($invoiceNumber))
         {
@@ -397,7 +397,7 @@ $app->get('/invoice/{invoiceNumber}/pdf',function(Request $request, Response $re
                         $inv['invoiceUrl'] = WEBSITE_DOMAIN.$invoicePDF;
                         $resp = array();
                         $resp['error'] = false;
-                        $resp['message'] = "New Invoice Found";
+                        $resp['message'] = INVOICE_FOUND_NEW;
                         $resp['invoice'] = $inv;
                         $response->write(json_encode($resp));
                         return $response->withHeader(CT,AJ)
@@ -409,7 +409,7 @@ $app->get('/invoice/{invoiceNumber}/pdf',function(Request $request, Response $re
                     $inv['invoiceUrl'] = WEBSITE_DOMAIN.$invoiceUrl;
                     $resp = array();
                     $resp['error'] = false;
-                    $resp['message'] = "Invoice Found";
+                    $resp['message'] = INVOICE_FOUND;
                     $resp['invoice'] = $inv;
                     $response->write(json_encode($resp));
                     return $response->withHeader(CT,AJ)
@@ -417,13 +417,37 @@ $app->get('/invoice/{invoiceNumber}/pdf',function(Request $request, Response $re
                 }
             }
             else
-                return returnException(true,"Invoice Not Found",$response);
+                return returnException(true,INVOICE_NOT_FOUND,$response);
         }
         else
-            return returnException(true,"Invoice Not Found",$response);
-    // }
-    // else
-        // return returnException(true,UNAUTH_ACCESS,$response);
+            return returnException(true,INVOICE_NOT_FOUND,$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/invoice/{invoiceNumber}/payments',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $invoiceNumber = $args['invoiceNumber'];
+        if ($db->isInvoiceExist($invoiceNumber))
+        {
+            $payment = $db->getPaymentsByInvoiceNumber($invoiceNumber);
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = PAYMENT_FOUND;
+            $resp['payments'] = $payment;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,PAYMENT_NOT_FOUND,$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
 });
 
 $app->get('/invoice/{invoiceNumber}',function(Request $request, Response $response, array $args)
@@ -446,10 +470,10 @@ $app->get('/invoice/{invoiceNumber}',function(Request $request, Response $respon
                                 ->withStatus(200);
             }
             else
-                return returnException(true,"Invoice Not Found",$response);
+                return returnException(true,INVOICE_NOT_FOUND,$response);
         }
         else
-            return returnException(true,"Invoice Not Found",$response);
+            return returnException(true,INVOICE_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -465,14 +489,14 @@ $app->get('/sales/today',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "Sales List Found";
+            $resp['message'] = SALES_LIST_FOUND;
             $resp['sales'] = $sales;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Sales Record Found",$response);
+            return returnException(true,SALES_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -488,14 +512,14 @@ $app->get('/sales/all',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "Sales List Found";
+            $resp['message'] = SALES_LIST_FOUND;
             $resp['sales'] = $sales;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Sales Record Found",$response);
+            return returnException(true,SALES_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -511,14 +535,14 @@ $app->get('/brands',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "Brand List Found";
+            $resp['message'] = BRAND_LIST_FOUND;
             $resp['brands'] = $brands;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Brands Found",$response);
+            return returnException(true,BRAND_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -1120,13 +1144,14 @@ function checkEmptyParameter($requiredParameter,$request,$response)
 
 function makeInvoice($db,$invoiceInfo)
 {
+    require_once '../include/Constants.php';
+    // require_once __DIR__ . '../include/Constants.php';
     $fullInvoiceHTMl = null;
-
     $count = 0;
-    $companyName = 'FAROOQUI HERBAL CO.';
-    $companyEmail = 'farooquiherbal@gmail.com';
-    $companyNumber = '+91 9920464508';
-    $companyAddress = 'Nadkar Complex, Tanwar Nagar, Kausa, Mumbra';
+    $companyName = COMPANY_NAME;
+    $companyEmail = COMPANY_EMAIL;
+    $companyNumber = COMPANY_CONTACT_NUMBER;
+    $companyAddress = COMPANY_ADDRESS;
     $invoiceNumber = $invoiceInfo['invoiceNumber'];
     $invoiceDate = $invoiceInfo['invoiceDate'];
     $invoiceAmount = $invoiceInfo['invoiceAmount'];
@@ -1195,7 +1220,7 @@ function getInvoiceHeader($sellerImage,$companyName,$companyNumber,$companyEmail
         <div class="col-xs-4 col-sm-4 col-md-4 text-right">
         <div class="receipt-right">
         <h5>$companyName</h5>
-        <p>+91 $companyNumber<i class="fa fa-phone"></i></p>
+        <p>$companyNumber<i class="fa fa-phone"></i></p>
         <p>$companyEmail<i class="fa fa-envelope-o"></i></p>
         <p>$companyAddress<i class="fa fa-location-arrow"></i></p>
         </div>
@@ -1287,7 +1312,7 @@ function getInvoiceFooter($priceAllTotalAmount,$priceAllDiscountAmount,$invoiceD
                   </body>
                   </html>
         HERE;
-return $invoiceHeader;
+        return $invoiceHeader;
 }
 
 /*
