@@ -248,6 +248,68 @@ $app->get('/sellers',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
+$app->get('/seller/{sellerId}',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sellerId = $args['sellerId'];
+        if (!empty($sellerId)) 
+        {
+            if ( $db->isSellerExist($sellerId)) 
+            {
+                $sellers = $db->getSellerById($sellerId);
+                if(!empty($sellers))
+                {
+                    $resp = array();
+                    $resp['error'] = false;
+                    $resp['message'] = "Seller Found";
+                    $resp['seller'] = $sellers;
+                    $response->write(json_encode($resp));
+                    return $response->withHeader(CT,AJ)
+                                    ->withStatus(200);
+                }
+                else
+                    return returnException(true,SELLER_NOT_FOUND,$response);
+            }
+            else
+                return returnException(true,SELLER_NOT_FOUND,$response);
+        }
+        else
+            return returnException(true,"Required Parameter sellerId is missing",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/seller/{sellerId}/invoice',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sellerId = $args['sellerId'];
+        if (empty($sellerId))
+            return returnException(true,"Required parameter sellerId is missing",$response);
+        if (!$db->isSellerExist($sellerId))
+            return returnException(true,SELLER_NOT_FOUND,$response);
+        $invoices = $db->getInvoicesBySellerId($sellerId);
+        if(!empty($invoices))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = INVOICE_LIST_FOUND;
+            $resp['invoices'] = $invoices;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,SALES_RECORD_NOT_FOUND,$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
 $app->post('/brand/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;

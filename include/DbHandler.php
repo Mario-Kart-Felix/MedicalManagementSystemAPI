@@ -179,10 +179,10 @@ class DbHandler
         if (isset($sellerImage) && !empty($sellerImage))
             $seller['sellerImage'] = WEBSITE_DOMAIN.$sellerImage;
         else
-            $seller['sellerImage'] = null;
+            $seller['sellerImage'] = WEBSITE_DOMAIN.'uploads/api/user.png';
         $seller['sellerAddress'] = $sellerAddress;
-        array_push($sellers, $seller);
-        return $sellers;
+        // array_push($sellers, $seller);
+        return $seller;
     }
 
     function isSellerExist($sellerId)
@@ -502,7 +502,6 @@ class DbHandler
             $paidAmount                     = (int) $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
             $invoiceRemainingAmount         = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']) - (int) $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
             $seller                         = $this->getSellerById($invoice['sellerId']);
-            $seller                         = $seller[0];
             $sellerImage                    = $seller['sellerImage'];
             if (empty($sellerImage))
                 $sellerImage = WEBSITE_DOMAIN.'uploads/api/user.png';
@@ -527,6 +526,58 @@ class DbHandler
             $inv['sellerAddress']           = $seller['sellerAddress'];
         }
         return $inv;
+    }
+
+    function getInvoicesBySellerId($sellerId)
+    {
+        $invoice = array();
+        $invoices = array();
+        $invoicess = array();
+        $pro = array();
+        $query = "SELECT invoice_id,invoice_number,seller_id,invoice_date FROM invoices WHERE seller_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$sellerId);
+        $stmt->execute();
+        $stmt->bind_result($invoiceId,$invoiceNumber,$sellerId,$invoiceDate);
+        while($stmt->fetch())
+        {
+            $invoice['invoiceId']           = $invoiceId;
+            $invoice['invoiceNumber']       = $invoiceNumber;
+            $invoice['sellerId']            = $sellerId;
+            $invoice['invoiceDate']         = $invoiceDate;
+            array_push($invoices, $invoice);
+        }
+        $stmt->close();
+        foreach ($invoices as  $invoice)
+        {
+            $paidAmount                     = (int) $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $invoiceRemainingAmount         = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']) - (int) $this->getAllPaidAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $seller                         = $this->getSellerById($invoice['sellerId']);
+            // $seller                         = $seller[0];
+            $sellerImage                    = $seller['sellerImage'];
+            if (empty($sellerImage))
+                $sellerImage = WEBSITE_DOMAIN.'uploads/api/user.png';
+            if (empty($paidAmount))
+                $paidAmount = 0;
+            if (empty($invoiceRemainingAmount ))
+                $invoiceRemainingAmount  = 0;
+            $inv['invoiceId']               = $invoice['invoiceId'];
+            $inv['invoiceNumber']           = $invoice['invoiceNumber'];
+            $inv['invoiceDate']             = $invoice['invoiceDate'];
+            $inv['invoiceAmount']           = $this->getTotalAmountByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoiceTotalPrice']       = $this->getTotalPriceOfInvoiceByInvoiceNumber($invoice['invoiceNumber']);
+            $inv['invoicePaidAmount']       = $paidAmount;
+            $inv['invoiceRemainingAmount']  = $invoiceRemainingAmount;
+            $inv['invoiceStatus']           = $this->isInvoicePaid($inv['invoiceNumber']);
+            $inv['sellerName']              = $seller['sellerFirstName'].' '.$seller['sellerLastName'];
+            $inv['sellerImage']             = $sellerImage;
+            $inv['sellerId']     = $seller['sellerId'];
+            $inv['sellerContactNumber']     = $seller['sellerContactNumber'];
+            $inv['sellerContactNumber1']    = $seller['sellerContactNumber1'];
+            $inv['sellerAddress']           = $seller['sellerAddress'];
+            array_push($invoicess, $inv);
+        }
+        return $invoicess;
     }
 
     function getPaymentsByInvoiceNumber($invoiceNumber)
@@ -1004,7 +1055,7 @@ class DbHandler
         foreach ($invoices as  $invoice)
         {
             $seller                         = $this->getSellerById($invoice['sellerId']);
-            $seller                         = $seller[0];
+            // $seller                         = $seller[0];
             $inv['invoiceId']               = $invoice['invoiceId'];
             $inv['invoiceNumber']           = $invoice['invoiceNumber'];
             $inv['invoiceDate']             = $invoice['invoiceDate'];
