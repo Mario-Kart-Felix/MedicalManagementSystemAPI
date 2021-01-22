@@ -157,13 +157,13 @@ class DbHandler
     {
         $rec = array();
         $record = array();
-        $query = "select date_format(created_at,'%D'),sum(sell_price) from sells group by month(created_at),day(created_at) order by month(created_at),day(created_at) LIMIT 7";
+        $query = "select date_format(created_at,'%d'),sum(sell_price) from sells WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) group by week(created_at),day(created_at) order by month(created_at),day(created_at) ASC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();  
-        $stmt->bind_result($month,$sellPrice);
+        $stmt->bind_result($day,$sellPrice);
         while($stmt->fetch())
         {
-            $rec['day']= $month;
+            $rec['day']= $day;
             $rec['totalSales'] = $sellPrice;
             array_push($record, $rec);
         }
@@ -693,8 +693,6 @@ class DbHandler
         return $paymentss;
     }
 
-
-
     function getSellerSellProductsByInvoiceNumber($invoiceNumber)
     {
         $products = array();
@@ -734,7 +732,6 @@ class DbHandler
             return true;
         else
             return false;
-
     }
 
     // Working on this one function or from this ones function ok, first need to fetch the full details item of a product which is sold
@@ -1497,7 +1494,6 @@ class DbHandler
         $products['productsExpiredCount'] = $count;
         return $products;
     }
-
 
     function getProductsCount()
     {

@@ -587,7 +587,7 @@ $app->get('/sales/all',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/sales/month/status',function(Request $request, Response $response)
+$app->get('/sales/status/months',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -610,7 +610,7 @@ $app->get('/sales/month/status',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/sales/day/status',function(Request $request, Response $response)
+$app->get('/sales/status/days',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
