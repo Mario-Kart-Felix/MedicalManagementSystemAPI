@@ -136,6 +136,86 @@ class DbHandler
             return false;
     }
 
+    function getSalesStatusOfEveryMonth()
+    {
+        $rec = array();
+        $record = array();
+        $query = "select date_format(created_at,'%M'),sum(sell_price) from sells group by year(created_at),month(created_at) order by year(created_at),month(created_at)";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();  
+        $stmt->bind_result($month,$sellPrice);
+        while($stmt->fetch())
+        {
+            $rec['month']= $month;
+            $rec['totalSales'] = $sellPrice;
+            array_push($record, $rec);
+        }
+        return $record;
+    }
+
+    function getSalesStatusOfEveryDay()
+    {
+        $rec = array();
+        $record = array();
+        $query = "select date_format(created_at,'%D'),sum(sell_price) from sells group by month(created_at),day(created_at) order by month(created_at),day(created_at) LIMIT 7";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();  
+        $stmt->bind_result($month,$sellPrice);
+        while($stmt->fetch())
+        {
+            $rec['day']= $month;
+            $rec['totalSales'] = $sellPrice;
+            array_push($record, $rec);
+        }
+        return $record;
+    }
+
+    function getMonthName($monthNumber)
+    {
+        switch ($monthNumber) {
+            case '01':
+                return 'January';
+                break;
+            case '02':
+                return 'February';
+                break;
+            case '03':
+                return 'March';
+                break;
+            case '04':
+                return 'April';
+                break;
+            case '05':
+                return 'May';
+                break;
+            case '06':
+                return 'June';
+                break;
+            case '07':
+                return 'July';
+                break;
+            case '08':
+                return 'August';
+                break;
+            case '09':
+                return 'September';
+                break;
+            case '10':
+                return 'October';
+                break;
+            case '11':
+                return 'November';
+                break;
+            case '12':
+                return 'December';
+                break;
+            
+            default:
+                # code...
+                break;
+        }
+    }
+
     function getSellers()
     {
         $sellers = array();
@@ -1402,6 +1482,22 @@ class DbHandler
         }
         return $productss;
     }
+
+    function getExpiredProductsCount()
+    {
+        $count = 0;
+        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire<CURDATE() ORDER by product_expire ASC";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();
+        $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$productQuantity,$locationId,$productManufacture,$productExpire);
+        while ($stmt->fetch())
+        {
+            $count++;
+        }
+        $products['productsExpiredCount'] = $count;
+        return $products;
+    }
+
 
     function getProductsCount()
     {

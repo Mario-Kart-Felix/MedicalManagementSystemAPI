@@ -95,7 +95,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->sellProductToSeller('165','FHC10006');
+        $responseG['data'] = $db->getSalesStatusOfEveryDay();
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -587,6 +587,52 @@ $app->get('/sales/all',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
+$app->get('/sales/month/status',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sales = $db->getSalesStatusOfEveryMonth();
+        if(!empty($sales))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Sales Record Found";
+            $resp['status'] = $sales;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"Sales Record Not Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/sales/day/status',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sales = $db->getSalesStatusOfEveryDay();
+        if(!empty($sales))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Sales Record Found";
+            $resp['status'] = $sales;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"Sales Record Not Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
 $app->get('/brands',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -790,6 +836,29 @@ $app->get('/counts/products/expiring',function(Request $request, Response $respo
         }
         else
             return returnException(true,"No Products Expiring Count Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/counts/products/expired',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $productsExpiringCount = $db->getExpiredProductsCount();
+        if(!empty($productsExpiringCount))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Products Expired Count Found";
+            $resp['products'] = $productsExpiringCount;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Products Expired Count Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
