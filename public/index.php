@@ -67,7 +67,7 @@ $app->get('/demo',function(Request $request, Response $response,array $args )
     $db->setUserId(819);
     // $users = array();
         $responseG = array();
-        $responseG['data'] = $db->getInvoiceByInvoiceNumber('FHC10002');
+        $responseG['data'] = $db->getNoticeProductsCount();
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);

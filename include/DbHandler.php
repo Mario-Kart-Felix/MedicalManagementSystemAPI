@@ -1409,7 +1409,7 @@ class DbHandler
         $count = 0;
         $products = array();
         $productss = array();
-        $query = "SELECT product_id,product_quantity FROM products";
+        $query = "SELECT product_id,product_quantity FROM products WHERE product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire DESC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
         $stmt->bind_result($productId,$productQuantity);
@@ -1422,7 +1422,8 @@ class DbHandler
         foreach ($products as  $product)
         {
             $salesQuantity = $this->getAllSalesQuantityOfProudctById($product['productId']);
-            if ($product['productQuantity']-$salesQuantity<5)
+            $sellerSalesQuantity = $this->getAllSellerSalesQuantityOfProudctById($product['productId']);
+            if ($product['productQuantity']-$salesQuantity-$sellerSalesQuantity<5)
             {
                 $count++;
             }
