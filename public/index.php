@@ -95,7 +95,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->getSalesStatusOfEveryDay();
+        $responseG['data'] = $db->getTopTenMostSalesProduct();
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -628,6 +628,29 @@ $app->get('/sales/status/days',function(Request $request, Response $response)
         }
         else
             return returnException(true,"Sales Record Not Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/sales/status/products',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sales = $db->getTopTenMostSalesProduct();
+        if(!empty($sales))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Top 10 Sellings Product Found";
+            $resp['products'] = $sales;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Product Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);

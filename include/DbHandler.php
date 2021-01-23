@@ -170,6 +170,31 @@ class DbHandler
         return $record;
     }
 
+    function getTopTenMostSalesProduct()
+    {
+        $rec = array();
+        $record = array();
+        $products = array();
+        $query = "SELECT product_id, SUM(sell_quantity), ROW_NUMBER() OVER (order by sum(sell_quantity) DESC) FROM sells GROUP BY product_id order by SUM(sell_quantity) DESC LIMIT 10";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();  
+        $stmt->bind_result($productId,$sellQuantity,$rank);
+        while($stmt->fetch())
+        {
+            $rec['productId']= $productId;
+            $rec['sellQuantity'] = $sellQuantity;
+            $rec['rank'] = $rank;
+            array_push($record, $rec);
+        }
+        foreach ($record as $rec) 
+        {
+            $pro = $this->getProductById($rec['productId']);
+            $pro['sellQuantity'] = $rec['sellQuantity'];
+            array_push($products, $pro);
+        }
+        return $products;
+    }
+
     function getMonthName($monthNumber)
     {
         switch ($monthNumber) {
