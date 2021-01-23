@@ -175,7 +175,32 @@ class DbHandler
         $rec = array();
         $record = array();
         $products = array();
-        $query = "SELECT product_id, SUM(sell_quantity), ROW_NUMBER() OVER (order by sum(sell_quantity) DESC) FROM sells GROUP BY product_id order by SUM(sell_quantity) DESC LIMIT 10";
+        $query = "SELECT product_id, SUM(sell_quantity), ROW_NUMBER() OVER (order by sum(sell_quantity) DESC) FROM sells WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) GROUP BY product_id order by SUM(sell_quantity) DESC LIMIT 10";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();  
+        $stmt->bind_result($productId,$sellQuantity,$rank);
+        while($stmt->fetch())
+        {
+            $rec['productId']= $productId;
+            $rec['sellQuantity'] = $sellQuantity;
+            $rec['rank'] = $rank;
+            array_push($record, $rec);
+        }
+        foreach ($record as $rec) 
+        {
+            $pro = $this->getProductById($rec['productId']);
+            $pro['sellQuantity'] = $rec['sellQuantity'];
+            array_push($products, $pro);
+        }
+        return $products;
+    }
+
+    function getTopTenMostSalesProductOfEveryMonth()
+    {
+        $rec = array();
+        $record = array();
+        $products = array();
+        $query = "SELECT product_id, SUM(sell_quantity), ROW_NUMBER() OVER (order by sum(sell_quantity) DESC) FROM sells WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) GROUP BY product_id order by SUM(sell_quantity) DESC LIMIT 10";
         $stmt = $this->con->prepare($query);
         $stmt->execute();  
         $stmt->bind_result($productId,$sellQuantity,$rank);
@@ -1360,7 +1385,8 @@ class DbHandler
         foreach ($products as  $product)
         {
             $salesQuantity = $this->getAllSalesQuantityOfProudctById($product['productId']);
-            if ($product['productQuantity']-$salesQuantity<5)
+            $sellerSalesQuantity = $this->getAllSellerSalesQuantityOfProudctById($product['productId']);
+            if ($product['productQuantity']-$salesQuantity-$sellerSalesQuantity<5)
             {
                 $pro['productId']               = $product['productId'];
                 $pro['productCategory']         = $this->getCategoryById($product['categoryId']);
@@ -1368,7 +1394,7 @@ class DbHandler
                 $pro['productSize']             = $this->getSizeById($product['sizeId']);
                 $pro['productBrand']            = $this->getBrandById($product['brandId']);
                 $pro['productPrice']            = $product['productPrice'];
-                $pro['productQuantity']         = $product['productQuantity']-$this->getSellQuantityByProductId($pro['productId']);
+                $pro['productQuantity']         = $product['productQuantity']-$this->getSellQuantityByProductId($pro['productId'])-$this->getAllSellerSalesQuantityOfProudctById($pro['productId']);
                 $pro['productLocation']         = $this->getLocationById($product['locationId']);
                 $pro['productManufacture']      = substr($product['productManufacture'], 0, 7);
                 $pro['productExpire']           = substr($product['productExpire'], 0, 7);
