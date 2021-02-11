@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jan 19, 2021 at 08:08 AM
+-- Generation Time: Feb 11, 2021 at 02:51 PM
 -- Server version: 10.4.11-MariaDB
 -- PHP Version: 7.4.6
 
@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `azmiunanistore`
+-- Database: `unanipharma`
 --
 
 -- --------------------------------------------------------
@@ -43,8 +43,9 @@ CREATE TABLE `admin` (
 --
 
 INSERT INTO `admin` (`id`, `name`, `username`, `email`, `password`, `image`, `status`, `timestamp`) VALUES
-(2, 'Azmi Unani Store', 'azmiunanistore', 'azmiunanistore@gmail.com', '$2y$10$mj40jM/kQRLg2Y5scscBouzna/e5I2RxyJSeRhbWjdAMm5vhg.h86', '', 1, '2020-12-21 10:05:47'),
-(194, 'Umair', 'Umair Farooqui', 'info.umairfarooqui@gmail.com', '$2y$10$mj40jM/kQRLg2Y5scscBouzna/e5I2RxyJSeRhbWjdAMm5vhg.h86', '', 1, '2021-01-06 16:50:53');
+(2, 'Unani Pharma', 'unanipharma', 'info@unanipharma.com', '$2y$10$mj40jM/kQRLg2Y5scscBouzna/e5I2RxyJSeRhbWjdAMm5vhg.h86', '', 1, '2021-02-11 10:08:30'),
+(194, 'Umair Farooqui', 'mufazmi', 'info.umairfarooqui@gmail.com', '$2y$10$mj40jM/kQRLg2Y5scscBouzna/e5I2RxyJSeRhbWjdAMm5vhg.h86', '', 1, '2021-02-11 10:09:51'),
+(204, 'Social Codia', 'SocialCodia', 'socialcodia@gmail.com', '$2y$10$mj40jM/kQRLg2Y5scscBouzna/e5I2RxyJSeRhbWjdAMm5vhg.h86', '', 1, '2021-01-06 16:50:53');
 
 -- --------------------------------------------------------
 
@@ -63,16 +64,7 @@ CREATE TABLE `brands` (
 --
 
 INSERT INTO `brands` (`brand_id`, `brand_name`, `created_at`) VALUES
-(17, 'DEHLVI', '2020-12-21 12:30:15'),
-(18, 'HAMDARD', '2020-12-21 12:31:29'),
-(19, 'OEBA', '2020-12-21 12:35:52'),
-(20, 'MEGHDOOT', '2021-01-01 15:34:40'),
-(21, 'SHAMA', '2021-01-02 16:02:15'),
-(22, 'SADAR', '2021-01-03 13:45:54'),
-(23, 'HBM', '2021-01-06 13:08:19'),
-(24, 'FHC', '2021-01-11 15:47:52'),
-(25, 'AMC', '2021-01-16 16:37:28'),
-(27, 'SOCIAL CODIA', '2021-01-19 07:01:02');
+(36, 'SC', '2021-02-11 13:45:10');
 
 -- --------------------------------------------------------
 
@@ -91,18 +83,75 @@ CREATE TABLE `categories` (
 --
 
 INSERT INTO `categories` (`category_id`, `category_name`, `created_at`) VALUES
-(12, 'SHARBAT', '2020-12-21 12:30:33'),
-(13, 'SYRUP', '2020-12-21 12:31:41'),
-(14, 'MAJOON', '2020-12-21 12:31:46'),
-(15, 'SHAMPOO', '2021-01-01 15:37:32'),
-(16, 'ROGHAN', '2021-01-01 16:00:30'),
-(17, 'TABLET', '2021-01-02 15:52:14'),
-(18, 'HABBE', '2021-01-07 14:23:50'),
-(19, 'CAPSULE', '2021-01-11 12:21:09'),
-(20, 'CHOORAN', '2021-01-11 15:48:27'),
-(21, 'KHAMIRA', '2021-01-12 16:16:23'),
-(22, 'ARAQ', '2021-01-17 11:25:39'),
-(23, 'PROGRAMMING', '2021-01-19 07:01:09');
+(29, 'SOCIAL', '2021-02-11 13:45:14');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `creditors`
+--
+
+CREATE TABLE `creditors` (
+  `creditorId` int(11) NOT NULL,
+  `creditorName` varchar(50) NOT NULL,
+  `creditorMobile` varchar(15) NOT NULL,
+  `creditorAddress` varchar(700) NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Dumping data for table `creditors`
+--
+
+INSERT INTO `creditors` (`creditorId`, `creditorName`, `creditorMobile`, `creditorAddress`, `timestamp`) VALUES
+(14, 'Umair Farooqui', '9867503256', 'Mumbai', '2021-02-11 13:48:02');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `creditpayments`
+--
+
+CREATE TABLE `creditpayments` (
+  `paymentId` int(11) NOT NULL,
+  `paymentMode` varchar(100) NOT NULL,
+  `paymentDate` datetime NOT NULL,
+  `paymentAmount` int(100) NOT NULL,
+  `paymentReciever` int(200) NOT NULL,
+  `creditId` int(100) NOT NULL,
+  `creditorId` int(100) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Dumping data for table `creditpayments`
+--
+
+INSERT INTO `creditpayments` (`paymentId`, `paymentMode`, `paymentDate`, `paymentAmount`, `paymentReciever`, `creditId`, `creditorId`, `created_at`) VALUES
+(39, 'CASH', '2021-02-11 19:18:02', 500, 194, 57, 14, '2021-02-11 13:48:02'),
+(40, 'CASH', '2021-02-11 19:21:06', 50, 194, 57, 14, '2021-02-11 13:51:06');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `credits`
+--
+
+CREATE TABLE `credits` (
+  `creditId` int(11) NOT NULL,
+  `creditorId` int(44) NOT NULL,
+  `salesId` varchar(500) NOT NULL,
+  `creditDescription` varchar(1000) NOT NULL,
+  `creditTime` datetime NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Dumping data for table `credits`
+--
+
+INSERT INTO `credits` (`creditId`, `creditorId`, `salesId`, `creditDescription`, `creditTime`, `timestamp`) VALUES
+(57, 14, '[\"1142\"]', 'Umair will pay the remaining amount on upcoming friday.', '2021-02-11 19:18:02', '2021-02-11 13:48:02');
 
 -- --------------------------------------------------------
 
@@ -126,7 +175,7 @@ CREATE TABLE `invoices` (
 --
 
 INSERT INTO `invoices` (`invoice_id`, `invoice_number`, `seller_id`, `invoice_date`, `invoice_url`, `total_amount`, `paid_amount`, `created_at`) VALUES
-(87, 'FHC10001', 12, '2021-01-19', 'uploads/invoices/FHC1000127637035861.pdf', 0, 0, '2021-01-19 07:07:48');
+(90, 'FHC10001', 12, '2021-02-11', 'uploads/invoices/FHC1000126220021180.pdf', 0, 0, '2021-02-11 13:49:20');
 
 -- --------------------------------------------------------
 
@@ -165,7 +214,33 @@ INSERT INTO `locations` (`location_id`, `location_name`, `created_at`) VALUES
 (40, 'C2', '2021-01-07 14:24:33'),
 (42, 'UNDEFINED', '2021-01-11 15:48:04'),
 (43, 'D5', '2021-01-17 11:26:32'),
-(44, 'D6', '2021-01-17 11:26:34');
+(44, 'D6', '2021-01-17 11:26:34'),
+(50, 'A0', '2021-01-18 16:17:14'),
+(51, 'B0', '2021-01-18 16:17:17'),
+(52, 'C0', '2021-01-18 16:17:20'),
+(53, 'D0', '2021-01-18 16:17:22'),
+(54, 'E0', '2021-01-18 16:17:24'),
+(55, 'F0', '2021-01-18 16:17:26'),
+(56, 'G0', '2021-01-19 15:55:03'),
+(57, 'G1', '2021-01-19 15:55:06'),
+(58, 'G2', '2021-01-19 15:55:08'),
+(59, 'G3', '2021-01-19 15:55:11'),
+(60, 'G4', '2021-01-19 15:55:13'),
+(61, 'G5', '2021-01-19 15:55:15'),
+(62, 'G6', '2021-01-19 15:55:22'),
+(63, 'ALM0', '2021-01-23 15:40:57'),
+(64, 'ALM1', '2021-01-23 15:41:03'),
+(65, 'ALM2', '2021-01-23 17:03:20'),
+(66, 'ALM3', '2021-01-23 17:03:29'),
+(67, 'ALM4', '2021-01-23 17:03:32'),
+(68, 'ALM5', '2021-01-23 17:03:34'),
+(69, 'ALM6', '2021-01-23 17:03:35'),
+(71, 'TBL1', '2021-01-25 12:18:15'),
+(72, 'TBL2', '2021-01-25 12:18:17'),
+(73, 'TBL3', '2021-01-25 12:18:20'),
+(74, 'TBL4', '2021-01-25 12:18:23'),
+(75, 'TBL5', '2021-01-26 10:07:12'),
+(76, 'TBL6', '2021-01-26 10:07:19');
 
 -- --------------------------------------------------------
 
@@ -209,9 +284,7 @@ CREATE TABLE `products` (
 --
 
 INSERT INTO `products` (`product_id`, `category_id`, `product_name`, `size_id`, `brand_id`, `product_price`, `product_quantity`, `location_id`, `product_manufacture`, `product_expire`, `created_at`) VALUES
-(371, 23, 'ANDROID APPLICATION DEVELOPMENT', 26, 27, 300, 100, 24, '2018-07-01', '2024-08-01', '2021-01-19 07:02:09'),
-(372, 16, 'FAROOQUI MESSAGE OIL', 17, 24, 280, 500, 23, '2022-02-01', '2024-03-01', '2021-01-19 07:03:18'),
-(373, 16, 'FAROOQUI MESSAGE OIL', 15, 24, 80, 200, 23, '2022-02-01', '2024-03-01', '2021-01-19 07:03:37');
+(731, 29, 'APPLICATOIN DEVELOPMENT', 74, 36, 600, 300, 23, '2021-01-01', '2024-03-01', '2021-02-11 13:46:11');
 
 -- --------------------------------------------------------
 
@@ -238,9 +311,7 @@ CREATE TABLE `products_record` (
 --
 
 INSERT INTO `products_record` (`product_id`, `category_id`, `product_name`, `size_id`, `brand_id`, `product_price`, `product_quantity`, `location_id`, `product_manufacture`, `product_expire`, `created_at`) VALUES
-(371, 23, 'ANDROID APPLICATION DEVELOPMENT', 26, 27, 300, 100, 24, '2018-07-01', '2024-08-01', '2021-01-19 07:02:09'),
-(372, 16, 'FAROOQUI MESSAGE OIL', 17, 24, 280, 500, 23, '2022-02-01', '2024-03-01', '2021-01-19 07:03:18'),
-(373, 16, 'FAROOQUI MESSAGE OIL', 15, 24, 80, 200, 23, '2022-02-01', '2024-03-01', '2021-01-19 07:03:37');
+(731, 29, 'APPLICATOIN DEVELOPMENT', 74, 36, 600, 300, 23, '2021-01-01', '2024-03-01', '2021-02-11 13:46:11');
 
 -- --------------------------------------------------------
 
@@ -279,7 +350,7 @@ CREATE TABLE `sellers` (
 --
 
 INSERT INTO `sellers` (`seller_id`, `seller_fname`, `seller_lname`, `seller_email`, `seller_contact`, `seller_contact_1`, `seller_image`, `seller_address`) VALUES
-(12, 'UMAIR', 'FAROOQUI', 'SOCIALCODIA@GMAIL.COM', '9867503256', '7506597967', 'uploads/6006848de4f00.png', 'KHARDI VILLAGE ROAD, KAUSA, MUMBRA');
+(12, 'Umair', 'Farooqui', 'info.umairfarooqui@gmail.com', '9867503256', '', 'uploads/60046852a46be.png', '402, B Wing, Madina Park Building, Khardi Village Road, Kausa, Mumbra');
 
 -- --------------------------------------------------------
 
@@ -303,9 +374,7 @@ CREATE TABLE `sellers_sells` (
 --
 
 INSERT INTO `sellers_sells` (`sellers_sell_id`, `invoice_number`, `product_id`, `sell_quantity`, `sell_discount`, `sell_price`, `created_at`, `updated_at`) VALUES
-(11, 'FHC10001', 371, 10, 40, 1800, '2021-01-19 07:04:55', NULL),
-(12, 'FHC10001', 372, 100, 40, 16800, '2021-01-19 07:04:59', NULL),
-(13, 'FHC10001', 373, 150, 40, 7200, '2021-01-19 07:05:02', NULL);
+(29, 'FHC10001', 731, 10, 40, 3600, '2021-02-11 13:49:05', NULL);
 
 -- --------------------------------------------------------
 
@@ -317,6 +386,7 @@ CREATE TABLE `sells` (
   `sell_id` int(11) NOT NULL,
   `product_id` int(200) NOT NULL,
   `sell_quantity` int(200) NOT NULL,
+  `sell_discount` int(200) NOT NULL DEFAULT 0,
   `sell_price` int(200) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL
@@ -326,8 +396,9 @@ CREATE TABLE `sells` (
 -- Dumping data for table `sells`
 --
 
-INSERT INTO `sells` (`sell_id`, `product_id`, `sell_quantity`, `sell_price`, `created_at`, `updated_at`) VALUES
-(483, 371, 10, 1800, '2021-01-19 07:02:14', NULL);
+INSERT INTO `sells` (`sell_id`, `product_id`, `sell_quantity`, `sell_discount`, `sell_price`, `created_at`, `updated_at`) VALUES
+(1141, 731, 1, 0, 600, '2021-02-11 13:47:01', NULL),
+(1142, 731, 1, 0, 600, '2021-02-11 13:47:12', NULL);
 
 -- --------------------------------------------------------
 
@@ -379,7 +450,30 @@ INSERT INTO `sizes` (`size_id`, `size_name`, `size_type`, `created_at`) VALUES
 (43, '75GM', 0, '2021-01-12 16:19:02'),
 (44, '60 PILLS', 0, '2021-01-13 10:53:01'),
 (45, '120 PILLS', 0, '2021-01-13 10:54:54'),
-(46, '60 TABLET', 0, '2021-01-13 11:05:49');
+(46, '60 TABLET', 0, '2021-01-13 11:05:49'),
+(47, '60 CAPSULE', 0, '2021-01-18 13:29:01'),
+(48, '80 TABLET', 0, '2021-01-18 13:47:09'),
+(49, '33GM', 0, '2021-01-18 14:12:31'),
+(50, '280GM', 0, '2021-01-18 16:23:00'),
+(51, '6GMS', 0, '2021-01-19 16:13:24'),
+(52, '80 PILLS', 0, '2021-01-22 11:56:33'),
+(53, '380GM', 0, '2021-01-22 14:35:43'),
+(54, '380ML', 0, '2021-01-23 16:25:51'),
+(55, '125ML', 0, '2021-01-23 16:32:41'),
+(61, '1kgs', 0, '2021-01-24 08:05:10'),
+(62, '10ML', 0, '2021-01-24 11:21:18'),
+(63, '10GM', 0, '2021-01-24 12:25:17'),
+(64, 'TBL1', 0, '2021-01-25 12:18:01'),
+(65, 'TBL2', 0, '2021-01-25 12:18:05'),
+(66, 'TBL3', 0, '2021-01-25 12:18:08'),
+(67, '400 PILLS', 0, '2021-01-25 13:32:46'),
+(68, '15ML', 0, '2021-01-25 15:08:12'),
+(69, '20GM', 0, '2021-01-25 16:09:55'),
+(70, '25GM', 0, '2021-01-25 16:13:46'),
+(71, '30GM', 0, '2021-01-29 16:18:09'),
+(72, '15gm', 0, '2021-02-05 15:07:01'),
+(73, '250ML', 0, '2021-02-06 15:02:01'),
+(74, '2PC', 0, '2021-02-11 13:45:22');
 
 --
 -- Indexes for dumped tables
@@ -402,6 +496,24 @@ ALTER TABLE `brands`
 --
 ALTER TABLE `categories`
   ADD PRIMARY KEY (`category_id`);
+
+--
+-- Indexes for table `creditors`
+--
+ALTER TABLE `creditors`
+  ADD PRIMARY KEY (`creditorId`);
+
+--
+-- Indexes for table `creditpayments`
+--
+ALTER TABLE `creditpayments`
+  ADD PRIMARY KEY (`paymentId`);
+
+--
+-- Indexes for table `credits`
+--
+ALTER TABLE `credits`
+  ADD PRIMARY KEY (`creditId`);
 
 --
 -- Indexes for table `invoices`
@@ -471,49 +583,67 @@ ALTER TABLE `sizes`
 -- AUTO_INCREMENT for table `admin`
 --
 ALTER TABLE `admin`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=204;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=205;
 
 --
 -- AUTO_INCREMENT for table `brands`
 --
 ALTER TABLE `brands`
-  MODIFY `brand_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `brand_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
 
 --
 -- AUTO_INCREMENT for table `categories`
 --
 ALTER TABLE `categories`
-  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `category_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+
+--
+-- AUTO_INCREMENT for table `creditors`
+--
+ALTER TABLE `creditors`
+  MODIFY `creditorId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+
+--
+-- AUTO_INCREMENT for table `creditpayments`
+--
+ALTER TABLE `creditpayments`
+  MODIFY `paymentId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
+
+--
+-- AUTO_INCREMENT for table `credits`
+--
+ALTER TABLE `credits`
+  MODIFY `creditId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
 
 --
 -- AUTO_INCREMENT for table `invoices`
 --
 ALTER TABLE `invoices`
-  MODIFY `invoice_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=88;
+  MODIFY `invoice_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=91;
 
 --
 -- AUTO_INCREMENT for table `locations`
 --
 ALTER TABLE `locations`
-  MODIFY `location_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
+  MODIFY `location_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=77;
 
 --
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66;
+  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=69;
 
 --
 -- AUTO_INCREMENT for table `products`
 --
 ALTER TABLE `products`
-  MODIFY `product_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=374;
+  MODIFY `product_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=732;
 
 --
 -- AUTO_INCREMENT for table `products_record`
 --
 ALTER TABLE `products_record`
-  MODIFY `product_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=374;
+  MODIFY `product_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=732;
 
 --
 -- AUTO_INCREMENT for table `quantities`
@@ -525,25 +655,25 @@ ALTER TABLE `quantities`
 -- AUTO_INCREMENT for table `sellers`
 --
 ALTER TABLE `sellers`
-  MODIFY `seller_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `seller_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `sellers_sells`
 --
 ALTER TABLE `sellers_sells`
-  MODIFY `sellers_sell_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `sellers_sell_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `sells`
 --
 ALTER TABLE `sells`
-  MODIFY `sell_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=484;
+  MODIFY `sell_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1143;
 
 --
 -- AUTO_INCREMENT for table `sizes`
 --
 ALTER TABLE `sizes`
-  MODIFY `size_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
+  MODIFY `size_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=75;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

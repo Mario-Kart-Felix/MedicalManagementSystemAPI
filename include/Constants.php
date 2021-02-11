@@ -3,12 +3,12 @@
 ///////////////////////////////////////////////////// CHANGED INFORMATION /////////////////////////////////////////////////////
 
 //Database Connection
-define('DB_NAME','azmiunanistore');   //your database username
+define('DB_NAME','unanipharma');   //your database username
 define('DB_USER', 'root');          //your database name
 define('DB_PASS', '');              //your database password
 define('DB_HOST', 'localhost');     //your database host name
 
-define('WEBSITE_DOMAIN', 'http://socialcodia.net/azmiunanistorepdf/public/');
+define('WEBSITE_DOMAIN', 'http://socialcodia.net/unanipharmaapi/public/');
 define('WEBSITE_EMAIL', 'socialcodia@gmail.com');                    //your email address
 define('WEBSITE_EMAIL_PASSWORD', 'PASSWORD');                        //your email password
 define('WEBSITE_EMAIL_FROM', 'Social Codia');                        // your website name here
@@ -18,7 +18,7 @@ define('SMTP_SECURE', 'tls');
 
 
 
-define('WEBSITE_NAME', 'Azmi Unani Store');                              //your website name here
+define('WEBSITE_NAME', 'Unani Pharma');                              //your website name here
 define('WEBSITE_OWNER_NAME', 'Umair Farooqui');                      //your name, or anyones name, we will send this name with email verification mail.
 
 //This information will be used to genrate the invoice

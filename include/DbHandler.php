@@ -12,6 +12,8 @@ class DbHandler
     private $saleId;
     private $invoiceNumber;
     private $invoiceId;
+    private $creditorId;
+    private $creditId;
 
     function __construct()
     {
@@ -60,6 +62,26 @@ class DbHandler
     function getInvoiceId()
     {
         return $this->invoiceId;
+    }
+
+    function getCreditorId()
+    {
+        return $this->creditorId;
+    }
+
+    function setCreditorId($creditorId)
+    {
+        $this->creditorId = $creditorId;
+    }
+
+    function getCreditId()
+    {
+        return $this->creditId;
+    }
+
+    function setCreditId($creditId)
+    {
+        $this->creditId = $creditId;
     }
 
     function login($email,$password)
@@ -424,18 +446,35 @@ class DbHandler
             return false;
     }
 
+    function addCreditsPayment($creditId,$paymentAmount)
+    {
+        $creditorId = $this->getCreditorIdByCreditId($creditId);
+        $tokenId = $this->getUserId();
+        date_default_timezone_set('Asia/Kolkata');
+        $paymentMode = 'CASH';
+        $date = date('y/m/d H:i:s', time());
+        $query = "INSERT INTO creditPayments (paymentMode,paymentDate,paymentAmount,paymentReciever,creditId,creditorId) VALUES(?,?,?,?,?,?)";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param("ssssss",$paymentMode,$date,$paymentAmount,$tokenId,$creditId,$creditorId);
+        return ($stmt->execute()) ? true : false;
+    }
+
     function isPaymentAmountLessThanInvoiceAmount($invoiceNumber,$paymentAmount)
     {
         $invoiceAmount = (int) $this->getTotalAmountByInvoiceNumber($invoiceNumber);
         $paymentAmount = (int) $paymentAmount;
         $paidAmount = (int) $this->getAllPaidAmountByInvoiceNumber($invoiceNumber);
-        if ($invoiceAmount-$paidAmount-$paymentAmount>=0)
-        {
-            return true;
-        }
-        else
-            return false;
+        return ($invoiceAmount-$paidAmount-$paymentAmount>=0) ? true : false;
     }
+
+    function isPaymentAmountLessThanCreditAmount($creditId,$paymentAmount)
+    {
+        $invoiceAmount = (int) $this->getTotalAmountByCreditId($creditId);
+        $paymentAmount = (int) $paymentAmount;
+        $paidAmount = (int) $this->getAllPaidAmountByCreditId($creditId);
+        return ($invoiceAmount-$paidAmount-$paymentAmount>=0) ? true : false;
+    }
+
 
     function getAllPaidAmountByInvoiceNumber($invoiceNumber)
     {
@@ -457,6 +496,43 @@ class DbHandler
         $stmt->bind_result($totalAmount);
         $stmt->fetch();
         return $totalAmount;
+    }
+
+    function getTotalAmountByCreditId($creditId)
+    {
+        $salesId = $this->getSalesIdByCreditId($creditId);
+        $salesId = implode(",",$salesId);
+        $query = "SELECT SUM(sell_price) FROM sells WHERE sell_id IN ($salesId)";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();
+        $stmt->bind_result($totalAmount);
+        $stmt->fetch();
+        return $totalAmount;
+    }
+
+    function getSalesIdByCreditId($creditId)
+    {
+        $query = "SELECT salesId FROM credits WHERE creditId=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$creditId);
+        $stmt->execute();
+        $stmt->bind_result($salesId);
+        $stmt->fetch();
+        return json_decode($salesId);
+    }
+
+    function getRemainingAmountByCreditId($creditId)
+    {
+        $totalAmount = $this->getTotalAmountByCreditId($creditId);
+        $paidAmount = $this->getAllPaidAmountByCreditId($creditId);
+        return $totalAmount-$paidAmount;
+    }
+
+    function getCreditStatusById($creditId)
+    {
+        $totalAmount = $this->getTotalAmountByCreditId($creditId);
+        $paidAmount = $this->getAllPaidAmountByCreditId($creditId);
+        return ($totalAmount-$paidAmount==0) ? 'PAID' : 'UNPAID';
     }
 
     //CAFUSION : This function is not completed yet, We are not using this funtion to anywhere
@@ -515,6 +591,192 @@ class DbHandler
         }
         else
             return PRODUCT_QUANTITY_LOW;
+    }
+
+    function addCreditor($creditorName,$creditorMobile,$creditorAddress)
+    {
+        if (!$this->isCreditorExistByMobile($creditorMobile))
+        {
+            $query = "INSERT INTO creditors (creditorName,creditorMobile,creditorAddress) VALUES(?,?,?)";
+            $stmt = $this->con->prepare($query);
+            $stmt->bind_param("sss",$creditorName,$creditorMobile,$creditorAddress);
+            if ($stmt->execute())
+            {
+                $this->setCreditorId($stmt->insert_id);
+                return true;
+            }
+            else
+                return false;
+        }
+        else
+            return true;
+    }
+
+    function addCreditRecord($creditorName,$creditorMobile,$creditorAddress,$creditDescription,$paidAmount,$salesId)
+    {
+        $error = false;
+        foreach ($salesId as $sId)
+        {
+            if ($this->isSaleExist($sId))
+                $error = false;
+            else
+                $error = true;
+        }
+        if (empty($creditDescription))
+            $creditDescription = '';
+
+        if (empty($paidAmount))
+            $paidAmount = 0;
+
+        if (!$error)
+        {
+            $salesId = json_encode($salesId);
+            $salesIds = json_decode($salesId,true);
+            if ($this->addCreditor($creditorName,$creditorMobile,$creditorAddress))
+            {
+                date_default_timezone_set('Asia/Kolkata');
+                $date = new DateTime();
+                $creditTime = $date->format('Y-m-d H:i:s');
+                if ($this->getCreditorId()!=null)
+                    $creditorId = $this->getCreditorId();
+                else
+                    $creditorId = $this->getCreditorIdByMobileNumber($creditorMobile);
+                $query = "INSERT INTO credits (creditorId,salesId,creditDescription,creditTime) VALUES (?,?,?,?)";
+                $stmt = $this->con->prepare($query);
+                $stmt->bind_param('ssss',$creditorId,$salesId,$creditDescription,$creditTime);
+                if ($stmt->execute())
+                {
+                    $this->setCreditId($stmt->insert_id);
+                    if ($paidAmount>0) 
+                    {
+                        $creditorId = $this->getCreditorIdByMobileNumber($creditorMobile);
+                        $creditId = $this->getCreditId();
+                        return ($this->addCreditsPayment($creditId,$paidAmount)) ? true : false;
+                    }
+                    else
+                        return true;
+                }
+                else
+                    return false;
+            }
+        }
+    }
+
+    function getCredits()
+    {
+        $credits = array();
+        $creditss = array();
+        $products = array();
+        $query = "SELECT creditId,creditorId,creditDescription,salesId,creditTime FROM credits";
+        $stmt = $this->con->prepare($query);
+        $stmt->execute();
+        $stmt->bind_result($creditId,$creditorId,$creditDescription,$salesId,$creditTime);
+        while ($stmt->fetch())
+        {
+          $credit['creditId'] = $creditId;
+          $credit['creditorId'] = $creditorId;
+          $credit['creditDescription'] = $creditDescription;
+          $credit['salesId'] = json_decode($salesId);
+          $credit['creditTime'] = $creditTime;
+          array_push($credits, $credit);
+        }
+        $stmt->close();
+        foreach($credits as $credit)
+        {
+            $crdt['creditId'] = $credit['creditId'];
+            $crdt['creditTotalAmount'] = $this->getTotalAmountByCreditId($crdt['creditId']);
+            $crdt['creditPaidAmount'] = $this->getAllPaidAmountByCreditId($crdt['creditId']);
+            $crdt['creditRemainingAmount'] = $this->getRemainingAmountByCreditId($crdt['creditId']);
+            $crdt['creditStatus'] = $this->getCreditStatusById($crdt['creditId']);
+            $crdt['creditDescription'] = $credit['creditDescription'];
+            foreach ($credit['salesId'] as $id) {
+                $product= $this->getProductBySlaeId($id);
+                array_push($products, $product);
+            }
+            $crdt['creditor'] = $this->getCreditorById($credit['creditorId']);
+            $crdt['product'] = $products;
+            $crdt['creditDate'] = $credit['creditTime'];
+            $products = [];
+            array_push($creditss, $crdt);
+        }
+        return $creditss;
+    }
+
+    function getCreditById($creditId)
+    {
+        $credits = array();
+        $creditss = array();
+        $products = array();
+        $query = "SELECT creditId,creditorId,creditDescription,salesId,creditTime FROM credits WHERE creditId = ?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$creditId);
+        $stmt->execute();
+        $stmt->bind_result($creditId,$creditorId,$creditDescription,$salesId,$creditTime);
+        $stmt->fetch();
+        $credits['creditId'] = $creditId;
+        $credits['creditorId'] = $creditorId;
+        $credits['creditDescription'] = $creditDescription;
+        $credits['salesId'] = json_decode($salesId);
+        $credits['creditTime'] = $creditTime;
+        $stmt->close();
+        $crdt['creditId'] = $credits['creditId'];
+        $crdt['creditTotalAmount'] = $this->getTotalAmountByCreditId($credits['creditId']);
+        $crdt['creditPaidAmount'] = $this->getAllPaidAmountByCreditId($credits['creditId']);
+        $crdt['creditRemainingAmount'] = $this->getRemainingAmountByCreditId($credits['creditId']);
+        $crdt['creditStatus'] = $this->getCreditStatusById($credits['creditId']);
+        $crdt['creditDescription'] = $credits['creditDescription'];
+        foreach ($credits['salesId'] as $id) {
+            $product= $this->getSaleInfoBySaleId($id);
+            array_push($products, $product);
+        }
+        $crdt['creditor'] = $this->getCreditorById($credits['creditorId']);
+        $crdt['products'] = $products;
+        $crdt['creditDate'] = $credits['creditTime'];
+        return $crdt;
+    }
+
+    function getAllPaidAmountByCreditId($creditId)
+    {
+        $query = "SELECT SUM(paymentAmount) FROM creditPayments WHERE creditId=?";
+        $stmt =  $this->con->prepare($query);
+        $stmt->bind_param('s',$creditId);
+        $stmt->execute();
+        $stmt->bind_result($paymentAmount);
+        $stmt->fetch();
+        return ($paymentAmount<1) ? 0 : $paymentAmount;
+    }
+
+    function getCreditorById($creditorId)
+    {
+        $query = "SELECT creditorId,creditorName,creditorMobile,creditorAddress from creditors WHERE creditorId=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$creditorId);
+        $stmt->execute();
+        $stmt->bind_result($creditorId,$creditorName,$creditorMobile,$creditorAddress);
+        $stmt->fetch();
+        $creditor['creditorId'] = $creditorId;
+        $creditor['creditorName'] = $creditorName;
+        $creditor['creditorMobile'] = $creditorMobile;
+        $creditor['creditorAddress'] = $creditorAddress;
+        return $creditor;
+    }
+
+    function isCreditorExistByMobile($mobileNumber)
+    {
+        $query = "SELECT creditorId from creditors WHERE creditorMobile=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$mobileNumber);
+        $stmt->execute();
+        $stmt->bind_result($creditorId);
+        $stmt->store_result();
+        $stmt->fetch();
+        if ($stmt->num_rows()>0)
+        {
+            $this->setCreditorId($creditorId);
+            return true;
+        }
+        else
+            return false;
     }
 
     function sellProductToSeller($productId,$invoiceNumber)
@@ -605,6 +867,16 @@ class DbHandler
             return true;
         else
             return false;
+    }
+
+    function isCreditExist($creditId)
+    {
+        $query = "SELECT creditId from credits WHERE creditId =?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$creditId);
+        $stmt->execute();
+        $stmt->store_result();
+        return ($stmt->num_rows()>0) ? true : false;
     }
 
     function getInvoiceByInvoiceNumber($invoiceNumber)
@@ -738,6 +1010,39 @@ class DbHandler
             $pay['paymentDate']             = $payment['paymentDate'];
             $pay['paymentAmount']           = $payment['paymentAmount'];
             $pay['sellerId']                = $payment['sellerId'];
+            array_push($paymentss, $pay);
+        }
+        return $paymentss;
+    }
+
+    function getPaymentsByCreditId($creditId)
+    {
+        $invoice = array();
+        $payments = array();
+        $paymentss = array();
+        $pro = array();
+        $query = "SELECT paymentId,paymentDate,paymentAmount,creditId,creditorId FROM creditpayments WHERE creditId=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$creditId);
+        $stmt->execute();
+        $stmt->bind_result($paymentId,$paymentDate,$paymentAmount,$creditId,$creditorId);
+        while($stmt->fetch())
+        {
+            $payment['paymentId']       = $paymentId;
+            $payment['paymentDate']     = $paymentDate;
+            $payment['paymentAmount']   = $paymentAmount;
+            $payment['creditId']        = $creditId;
+            $payment['creditorId']        = $creditorId;
+            array_push($payments, $payment);
+        }
+        $stmt->close();
+        foreach ($payments as  $payment)
+        {
+            $pay['paymentId']               = $payment['paymentId'];
+            $pay['creditId']                = $payment['creditId'];
+            $pay['paymentDate']             = $payment['paymentDate'];
+            $pay['paymentAmount']           = $payment['paymentAmount'];
+            $pay['creditorId']              = $payment['creditorId'];
             array_push($paymentss, $pay);
         }
         return $paymentss;
@@ -889,7 +1194,48 @@ class DbHandler
         return $pro;
     }
 
-    function updateSellProduct($saleId,$productQuantity,$productSalePrice)
+    function getProductBySlaeId($saleId)
+    {
+        $productId = $this->getProductIdBySaleId($saleId);
+        $products = array();
+        $pro = array();
+        if (!$this->isProductExist($productId))
+           return $pro;
+        $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,location_id,product_manufacture,product_expire FROM products WHERE product_id=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$productId);
+        $stmt->execute();
+        $stmt->bind_result($productId,$categoryId,$productName,$sizeId,$brandId,$productPrice,$locationId,$productManufacture,$productExpire);
+        $stmt->fetch();
+        $product['productId']           = $productId;
+        $product['categoryId']          = $categoryId;
+        $product['productName']         = $productName;
+        $product['sizeId']              = $sizeId;
+        $product['brandId']             = $brandId;
+        $product['productPrice']        = $productPrice;
+        $product['locationId']          = $locationId;
+        $product['productManufacture']        = $productManufacture;
+        $product['productExpire']        = $productExpire;
+        array_push($products, $product);
+        $stmt->close();
+        foreach ($products as  $product)
+        {
+            $pro['productId']               = $product['productId'];
+            $pro['saleId']                  = $this->getSaleId(); 
+            $pro['productCategory']         = $this->getCategoryById($product['categoryId']);
+            $pro['productName']             = $product['productName'];
+            $pro['productSize']             = $this->getSizeById($product['sizeId']);
+            $pro['productBrand']            = $this->getBrandById($product['brandId']);
+            $pro['productPrice']            = $product['productPrice'];
+            $pro['productLocation']         = $this->getLocationById($product['locationId']);
+            $pro['productQuantity']         = $this->getProductCurrentQuantityById($product['productId']);
+            $pro['productManufacture']      = substr($product['productManufacture'], 0, 7);
+            $pro['productExpire']           = substr($product['productExpire'], 0, 7);
+        }
+        return $pro;
+    }
+
+    function updateSellProduct($saleId,$productQuantity,$sellDiscount,$productSalePrice)
     {
         if ($this->isSaleExist($saleId))
         {
@@ -897,9 +1243,9 @@ class DbHandler
             $currentSaleQuantity = $this->getSalesProductQuantityById($saleId);
             if ($this->getProductCurrentQuantityById($productId)+$currentSaleQuantity-$productQuantity>=0) 
             {
-                 $query = "UPDATE sells SET sell_quantity=?, sell_price=? WHERE sell_id=?";
+                 $query = "UPDATE sells SET sell_quantity=?, sell_discount=?, sell_price=? WHERE sell_id=?";
                 $stmt = $this->con->prepare($query);
-                $stmt->bind_param('sss',$productQuantity,$productSalePrice,$saleId);
+                $stmt->bind_param('ssss',$productQuantity,$sellDiscount,$productSalePrice,$saleId);
                 if ($stmt->execute())
                 {
                     return SALE_UPDATED;
@@ -1022,15 +1368,34 @@ class DbHandler
         return $productId;
     }
 
+    function getCreditorIdByCreditId($creditId)
+    {
+        $query = "SELECT creditorId from credits WHERE creditId=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$creditId);
+        $stmt->execute();
+        $stmt->bind_result($creditorId);
+        $stmt->fetch();
+        return $creditorId;
+    }
+
+    function getCreditorIdByMobileNumber($mobileNumber)
+    {
+        $query = "SELECT creditorId from creditors WHERE creditorMobile=?";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$mobileNumber);
+        $stmt->execute();
+        $stmt->bind_result($creditorId);
+        $stmt->fetch();
+        return $creditorId;
+    }
+
     function addSize($sizeName)
     {
         $query = "INSERT INTO sizes (size_name) VALUES(?)";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param("s",$sizeName);
-        if ($stmt->execute())
-            return true;
-        else
-            return false;
+        return ($stmt->execute()) ? true : false;
     }
 
     function addCategory($categoryName)
@@ -1038,10 +1403,7 @@ class DbHandler
         $query = "INSERT INTO categories (category_name) VALUES(?)";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param("s",$categoryName);
-        if ($stmt->execute())
-            return true;
-        else
-            return false;
+        return ($stmt->execute()) ? true : false;
     }
 
     function addLocation($locationName)
@@ -1049,10 +1411,7 @@ class DbHandler
         $query = "INSERT INTO locations (location_name) VALUES(?)";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param("s",$locationName);
-        if ($stmt->execute())
-            return true;
-        else
-            return false;
+        return ($stmt->execute()) ? true : false;
     }
 
     function isEmailExist($email)
@@ -1072,7 +1431,7 @@ class DbHandler
         $stmt->bind_param('s',$productId);
         $stmt->execute();
         $stmt->store_result();
-        return $stmt->num_rows>0 ;
+        return $stmt->num_rows>0;
     }
 
     function getBrands()
@@ -1234,6 +1593,7 @@ class DbHandler
     {
         $products = array();
         $pr = array();
+        $pro = array();
         date_default_timezone_set('Asia/Kolkata');
         $date = new DateTime();
         $date->setTime(00,00);
@@ -1364,6 +1724,7 @@ class DbHandler
     {
         $products = array();
         $productss = array();
+        $productsss = array();
         $query = "SELECT product_id,category_id,product_name,size_id,brand_id,product_price,product_quantity,location_id,product_manufacture,product_expire FROM products WHERE product_expire >= DATE_ADD(CURDATE(), INTERVAL 1 DAY) ORDER by product_expire DESC";
         $stmt = $this->con->prepare($query);
         $stmt->execute();
@@ -1382,7 +1743,12 @@ class DbHandler
             $product['productExpire']       = $productExpire;
             array_push($products, $product);
         }
-        foreach ($products as  $product)
+         // starting fresh code from here
+        foreach ($products as $product)
+        {
+            array_push($productsss, $product);
+        }
+        foreach ($productsss as  $product)
         {
             $salesQuantity = $this->getAllSalesQuantityOfProudctById($product['productId']);
             $sellerSalesQuantity = $this->getAllSellerSalesQuantityOfProudctById($product['productId']);
@@ -1611,6 +1977,40 @@ class DbHandler
         return $sizeName;
     }
 
+    function getSaleInfoBySaleId($saleId)
+    {
+        $simpleSaleInfo = $this->getSimpleSaleInfoBySaleId($saleId);
+        $product = $this->getProductById($simpleSaleInfo['productId']);
+        $products['productId'] = $product['productId'];
+        $products['productCategory']    =   $product['productCategory'];
+        $products['productName']        =   $product['productName'];
+        $products['productSize']        =   $product['productSize'];
+        $products['productBrand']       =   $product['productBrand'];
+        $products['productPrice']       =   $product['productPrice'];
+        $products['saleQuantity']       =   $simpleSaleInfo['saleQuantity'];
+        $products['saleDiscount']       =   $simpleSaleInfo['saleDiscount'];
+        $products['salePrice']          =   $simpleSaleInfo['salePrice'];
+        $products['productManufacture'] =   $product['productManufacture'];
+        $products['productExpire']      =   $product['productExpire'];
+        return $products;
+    }
+
+    function getSimpleSaleInfoBySaleId($saleId)
+    {
+        $record = array();
+        $query = "SELECT product_id,sell_quantity,sell_discount,sell_price FROM sells WHERE sell_id=? ";
+        $stmt = $this->con->prepare($query);
+        $stmt->bind_param('s',$saleId);
+        $stmt->execute();
+        $stmt->bind_result($productId,$saleQuantity,$saleDiscount,$salePrice);
+        $stmt->fetch();
+        $record['productId'] =  $productId;
+        $record['saleQuantity'] =  $saleQuantity;
+        $record['saleDiscount'] =  $saleDiscount;
+        $record['salePrice'] =  $salePrice;
+        return $record;
+    }
+
     function getSellQuantityByProductId($productId)
     {
         $query = "SELECT SUM(sell_quantity) FROM sells WHERE product_id=?";
@@ -1711,10 +2111,7 @@ class DbHandler
         $stmt->bind_param('s',$id);
         $stmt->execute();
         $stmt->store_result();
-        if ($stmt->num_rows>0)
-            return true;
-        else
-            return false;
+        return ($stmt->num_rows>0) ? true : false;
     }
 
     function getPasswordByEmail($email)
@@ -1762,18 +2159,16 @@ class DbHandler
 
     function getUserByEmail($email)
     {
-        $query = "SELECT id,name,username,email,image,status FROM admin WHERE email=?";
+        $query = "SELECT id,name,email,image FROM admin WHERE email=?";
         $stmt = $this->con->prepare($query);
         $stmt->bind_param('s',$email);
         $stmt->execute();
-        $stmt->bind_result($id,$name,$username,$email,$image,$status);
+        $stmt->bind_result($id,$name,$email,$image);
         $stmt->fetch();
         $user = array();
         $user['id'] = $id;
         $user['name'] = $name;
-        $user['username'] = $username;
         $user['email'] = $email;
-        $user['status'] = $status;
         if (empty($image))
             $image = DEFAULT_USER_IMAGE;
         $user['image'] = WEBSITE_DOMAIN.$image;

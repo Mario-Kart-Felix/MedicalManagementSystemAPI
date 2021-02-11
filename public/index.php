@@ -67,7 +67,7 @@ $app->get('/demo',function(Request $request, Response $response,array $args )
     $db->setUserId(819);
     // $users = array();
         $responseG = array();
-        $responseG['data'] = $db->getNoticeProductsCount();
+        $responseG['data'] = $db->getPaymentsByCreditId(1082);
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -95,7 +95,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->getTopTenMostSalesProduct();
+        $responseG['data'] = $db->getNoticeProducts();
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -369,6 +369,69 @@ $app->post('/payment/add',function(Request $request, Response $response)
             else
                 return returnException(true,SELLER_NOT_FOUND,$response);
         }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/credit/payment/add',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('creditId','paymentAmount'),$request,$response))
+        {
+            $requestParameter = $request->getParsedBody();
+            $creditId = $requestParameter['creditId'];
+            $paymentAmount = (int) $requestParameter['paymentAmount'];
+            if ($paymentAmount<=0)
+                return returnException(true,PAYMENT_AMOUNT_INCREASE,$response);
+            if ($db->isCreditExist($creditId)) 
+            {
+                if ($db->isPaymentAmountLessThanCreditAmount($creditId,$paymentAmount))
+                {
+                    if($db->addCreditsPayment($creditId,$paymentAmount))
+                    {
+                        $resp = array();
+                        $resp['error'] = false;
+                        $resp['message'] = 'Payment Success';
+                        $response->write(json_encode($resp));
+                        return $response->withHeader(CT,AJ)
+                                        ->withStatus(200);
+                    }
+                    else
+                        return returnException(true,PAYMENT_FAILED,$response);
+                }
+                else
+                    return returnException(true,"You Can't Accept More Than Credited Amount",$response);
+            }
+            else
+                return returnException(true,"No Credit Found",$response);
+        }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/credit/{creditId}/payments',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    // if (validateToken($db,$request,$response)) 
+    // {
+        $creditId = $args['creditId'];
+        if ($db->isCreditExist($creditId))
+        {
+            $payment = $db->getPaymentsByCreditId($creditId);
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = PAYMENT_FOUND;
+            $resp['payments'] = $payment;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        // }
+        // else
+        //     return returnException(true,PAYMENT_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -1031,6 +1094,38 @@ $app->post('/product/sell',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
+$app->post('/product/sell/credit',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('salesId','creditorName','creditorAddress'),$request,$response))
+        {
+            $requestParameter = $request->getParsedBody();
+            $salesId = $requestParameter['salesId'];
+            $salesId = json_decode($salesId);
+            $creditorName = $requestParameter['creditorName'];
+            $creditorAddress = $requestParameter['creditorAddress'];
+            $creditorMobile = null;
+            $paidAmount = null;
+            $creditDescription = null;
+            if (isset($requestParameter['creditorMobile']) && !empty($requestParameter['creditorMobile'] ))
+                $creditorMobile = $requestParameter['creditorMobile'];
+            if (isset($requestParameter['paidAmount']) && !empty($requestParameter['paidAmount']))
+                $paidAmount = $requestParameter['paidAmount'];
+            if (isset($requestParameter['creditDescription']) && !empty($requestParameter['creditDescription']))
+                $creditDescription = $requestParameter['creditDescription'];
+            $result = $db->addCreditRecord($creditorName,$creditorMobile,$creditorAddress,$creditDescription,$paidAmount,$salesId);
+            if($result)
+                return returnException(false,'Credit Added',$response);
+            else
+                return returnException(true,SWW,$response);
+        }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
 $app->post('/seller/product/sell',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -1060,6 +1155,55 @@ $app->post('/seller/product/sell',function(Request $request, Response $response)
                 else
                     return returnException(true,SWW,$response);
             }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/credits',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $credits = $db->getCredits();
+        if(!empty($credits))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Credits Found";
+            $resp['credits'] = $credits;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Credits Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/credit/{creditId}',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $creditId = $args['creditId'];
+        if (!$db->isCreditExist($creditId))
+            return returnException(true,"No Credit Found",$response);
+        $credits = $db->getCreditById($creditId);
+        if(!empty($credits))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Credits Found";
+            $resp['credit'] = $credits;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Credits Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -1193,7 +1337,10 @@ $app->post('/product/sell/update',function(Request $request, Response $response)
                 $saleId = $requestParameter['saleId'];
                 $productQuantity = $requestParameter['productQuantity'];
                 $productSellPrice = $requestParameter['productSellPrice'];
-                $result = $db->updateSellProduct($saleId,$productQuantity,$productSellPrice);
+                $productSellDiscount = 0;
+                if (isset($requestParameter['productSellDiscount']))
+                    $productSellDiscount = $requestParameter['productSellDiscount'];
+                $result = $db->updateSellProduct($saleId,$productQuantity,$productSellDiscount,$productSellPrice);
                 if($result == SALE_UPDATED)
                     return returnException(false,SALE_UPDATED,$response);
                 else if($result == SALE_UPDATE_FAILED)
