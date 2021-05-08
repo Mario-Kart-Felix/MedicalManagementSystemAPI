@@ -12,7 +12,7 @@ require '../vendor/autoload.php';
 require_once '../include/DbHandler.php';
 require_once '../vendor/autoload.php';
 require_once '../include/JWT.php';
-
+require_once __DIR__ . '/../vendor/autoload.php';
 $JWT = new JWT;
 
 $app = new \Slim\App;;
@@ -64,13 +64,26 @@ $app->post('/register', function(Request $request, Response $response)
 $app->get('/demo',function(Request $request, Response $response,array $args )
 {
     $db = new DbHandler;
-    $db->setUserId(190);
+    $db->setUserId(819);
     // $users = array();
         $responseG = array();
-        $responseG['data'] = $db->getProductById(60);
+        $responseG['data'] = $db->getPaymentsByCreditId(1082);
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
+});
+
+$app->get('/pdf',function(Request $request, Response $response,array $args )
+{
+    include 'invoice.php';
+    $mpdf = new \Mpdf\Mpdf(['orientation' => 'L']);
+    $stylesheet = file_get_contents('css/b.css'); // external css
+    // $stylesheet1 = file_get_contents('css/socialcodia.css'); // external css
+    $mpdf->WriteHTML($stylesheet,1);
+    // $mpdf->WriteHTML($stylesheet1,2);
+    $mpdf->WriteHTML($content,2);
+    echo $content;
+    $mpdf->Output('doc.pdf','');
 });
 
 $app->get('/demo1',function(Request $request, Response $response,array $args )
@@ -82,7 +95,7 @@ $app->get('/demo1',function(Request $request, Response $response,array $args )
         $responseG['success'] = true;
         $responseG[ERROR] = false;
         $responseG[MESSAGE] = "Searching Users By Keywords";
-        $responseG['data'] = $db->getAllSellers();
+        $responseG['data'] = $db->getNoticeProducts();
         $response->write(json_encode($responseG));
         return $response->withHeader(CT,AJ)
                 ->withStatus(200);
@@ -129,7 +142,35 @@ $app->post('/login', function(Request $request, Response $response)
     }
 });
 
-$app->post('/add/product',function(Request $request, Response $response)
+$app->post('/product/update',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('productId','productName','productBrand','productCategory','productSize','productLocation','productPrice','productQuantity','productManufactureDate','productExpireDate'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $productId = $requestParameter['productId'];
+                $productName = $requestParameter['productName'];
+                $productBrand = $requestParameter['productBrand'];
+                $productCategory = $requestParameter['productCategory'];
+                $productSize = $requestParameter['productSize'];
+                $productLocation = $requestParameter['productLocation'];
+                $productPrice = $requestParameter['productPrice'];
+                $productQuantity = $requestParameter['productQuantity'];
+                $productManufactureDate = $requestParameter['productManufactureDate'];
+                $productExpireDate = $requestParameter['productExpireDate'];
+                if($db->updateProduct($productId,$productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate))
+                    return returnException(false,"Product Updated",$response);
+                else
+                    return returnException(true,"Failed To Update Product",$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/product/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -147,16 +188,16 @@ $app->post('/add/product',function(Request $request, Response $response)
                 $productManufactureDate = $requestParameter['productManufactureDate'];
                 $productExpireDate = $requestParameter['productExpireDate'];
                 if($db->addProduct($productName,$productBrand,$productCategory,$productSize,$productLocation,$productPrice,$productQuantity,$productManufactureDate,$productExpireDate))
-                    return returnException(false,"Product Added",$response);
+                    return returnException(false,PRODUCT_ADDED,$response);
                 else
-                    return returnException(true,"Failed To Add Product",$response);
+                    return returnException(true,PRODUCT_ADDED_FAILED,$response);
             }
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/seller',function(Request $request, Response $response)
+$app->post('/seller/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -175,9 +216,9 @@ $app->post('/add/seller',function(Request $request, Response $response)
                 $sellerContactNumber1 = $requestParameter['sellerContactNumber1'];
                 $sellerAddress = $requestParameter['sellerAddress'];
                 if($db->addSeller($sellerFirstName,$sellerLastName,$sellerEmail,$sellerContactNumber,$sellerContactNumber1,$sellerImage,$sellerAddress))
-                    return returnException(false,"Seller Information Added",$response);
+                    return returnException(false,SELLER_INFORMATION_ADDED,$response);
                 else
-                    return returnException(true,"Failed To Add Seller Information",$response);
+                    return returnException(true,SELLER_INFORMATION_ADD_FAILED,$response);
             }
     }
     else
@@ -194,20 +235,82 @@ $app->get('/sellers',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "Sellers List Found";
+            $resp['message'] = SELLER_LIST_FOUND;
             $resp['sellers'] = $sellers;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Seller Found",$response);
+            return returnException(true,SELLER_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/brand',function(Request $request, Response $response)
+$app->get('/seller/{sellerId}',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sellerId = $args['sellerId'];
+        if (!empty($sellerId)) 
+        {
+            if ( $db->isSellerExist($sellerId)) 
+            {
+                $sellers = $db->getSellerById($sellerId);
+                if(!empty($sellers))
+                {
+                    $resp = array();
+                    $resp['error'] = false;
+                    $resp['message'] = "Seller Found";
+                    $resp['seller'] = $sellers;
+                    $response->write(json_encode($resp));
+                    return $response->withHeader(CT,AJ)
+                                    ->withStatus(200);
+                }
+                else
+                    return returnException(true,SELLER_NOT_FOUND,$response);
+            }
+            else
+                return returnException(true,SELLER_NOT_FOUND,$response);
+        }
+        else
+            return returnException(true,"Required Parameter sellerId is missing",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/seller/{sellerId}/invoice',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sellerId = $args['sellerId'];
+        if (empty($sellerId))
+            return returnException(true,"Required parameter sellerId is missing",$response);
+        if (!$db->isSellerExist($sellerId))
+            return returnException(true,SELLER_NOT_FOUND,$response);
+        $invoices = $db->getInvoicesBySellerId($sellerId);
+        if(!empty($invoices))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = INVOICE_LIST_FOUND;
+            $resp['invoices'] = $invoices;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,SALES_RECORD_NOT_FOUND,$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/brand/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -217,10 +320,285 @@ $app->post('/add/brand',function(Request $request, Response $response)
                 $requestParameter = $request->getParsedBody();
                 $brandName = $requestParameter['brandName'];
                 if($db->addBrand($brandName))
-                    return returnException(false,"Brand Added",$response);
+                    return returnException(false,BRAND_ADDED,$response);
                 else
-                    return returnException(true,"Failed To Add Brand",$response);
+                    return returnException(true,BRAND_ADD_FAILED,$response);
             }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/payment/add',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('sellerId','invoiceNumber','paymentAmount'),$request,$response))
+        {
+            $requestParameter = $request->getParsedBody();
+            $sellerId = $requestParameter['sellerId'];
+            $invoiceNumber = $requestParameter['invoiceNumber'];
+            $paymentAmount = (int) $requestParameter['paymentAmount'];
+            if ($paymentAmount<=0)
+                return returnException(true,PAYMENT_AMOUNT_INCREASE,$response);
+            if ($db->isSellerExist($sellerId)) 
+            {
+                if ($db->isInvoiceExist($invoiceNumber)) 
+                {
+                    if ($db->isPaymentAmountLessThanInvoiceAmount($invoiceNumber,$paymentAmount))
+                    {
+                        if($db->addPayment($sellerId,$invoiceNumber,$paymentAmount))
+                        {
+                            $resp = array();
+                            $resp['error'] = false;
+                            $resp['message'] = 'Payment Success';
+                            $response->write(json_encode($resp));
+                            return $response->withHeader(CT,AJ)
+                                            ->withStatus(200);
+                        }
+                        else
+                            return returnException(true,PAYMENT_FAILED,$response);
+                    }
+                    else
+                        return returnException(true,PAYMENT_AMOUNT_GREATER,$response);
+                }
+                else
+                    return returnException(true,INVOICE_NOT_FOUND,$response);
+            }
+            else
+                return returnException(true,SELLER_NOT_FOUND,$response);
+        }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/credit/payment/add',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('creditId','paymentAmount'),$request,$response))
+        {
+            $requestParameter = $request->getParsedBody();
+            $creditId = $requestParameter['creditId'];
+            $paymentAmount = (int) $requestParameter['paymentAmount'];
+            if ($paymentAmount<=0)
+                return returnException(true,PAYMENT_AMOUNT_INCREASE,$response);
+            if ($db->isCreditExist($creditId)) 
+            {
+                if ($db->isPaymentAmountLessThanCreditAmount($creditId,$paymentAmount))
+                {
+                    if($db->addCreditsPayment($creditId,$paymentAmount))
+                    {
+                        $resp = array();
+                        $resp['error'] = false;
+                        $resp['message'] = 'Payment Success';
+                        $response->write(json_encode($resp));
+                        return $response->withHeader(CT,AJ)
+                                        ->withStatus(200);
+                    }
+                    else
+                        return returnException(true,PAYMENT_FAILED,$response);
+                }
+                else
+                    return returnException(true,"You Can't Accept More Than Credited Amount",$response);
+            }
+            else
+                return returnException(true,"No Credit Found",$response);
+        }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/credit/{creditId}/payments',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    // if (validateToken($db,$request,$response)) 
+    // {
+        $creditId = $args['creditId'];
+        if ($db->isCreditExist($creditId))
+        {
+            $payment = $db->getPaymentsByCreditId($creditId);
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = PAYMENT_FOUND;
+            $resp['payments'] = $payment;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        // }
+        // else
+        //     return returnException(true,PAYMENT_NOT_FOUND,$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/invoice/add',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('sellerId'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $sellerId = $requestParameter['sellerId'];
+                if ($db->isSellerExist($sellerId)) 
+                {
+                    if($db->addInvoice($sellerId))
+                    {
+                        $invoice['invoiceNumber'] = $db->getInvoiceNumber();
+                        $resp = array();
+                        $resp['error'] = false;
+                        $resp['message'] = INVOICE_ADDED;
+                        $resp['invoice'] = $invoice;
+                        $response->write(json_encode($resp));
+                        return $response->withHeader(CT,AJ)
+                                        ->withStatus(200);
+                    }
+                    else
+                        return returnException(true,INVOICE_ADD_FAILED,$response);
+                }
+                else
+                    return returnException(true,SELLER_NOT_FOUND,$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/invoices',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $invoices = $db->getInvoices();
+        if(!empty($invoices))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = INVOICE_LIST_FOUND;
+            $resp['invoices'] = $invoices;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,SALES_RECORD_NOT_FOUND,$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/invoice/{invoiceNumber}/pdf',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $invoiceNumber = $args['invoiceNumber'];
+        if ($db->isInvoiceExist($invoiceNumber))
+        {
+            $invoice = $db->getInvoiceByInvoiceNumber($invoiceNumber);
+            if(!empty($invoice))
+            {
+                $invoiceUrl = $db->getInvoiceUrlByInvoiceNumber($invoiceNumber);
+                if(empty($invoiceUrl))
+                {
+                    $invoice = makeInvoice($db,$invoice);
+                    $mpdf = new \Mpdf\Mpdf(['orientation' => 'L']);
+                    $stylesheet = file_get_contents('css/b.css'); // external css
+                    // $stylesheet1 = file_get_contents('css/socialcodia.css'); // external css
+                    $mpdf->WriteHTML($stylesheet,1);
+                    // $mpdf->WriteHTML($stylesheet1,2);
+                    $mpdf->WriteHTML($invoice,2);
+                    $randNumber = rand(10000000,99999999999);
+                    $invoicePDF = 'uploads/invoices/'.$invoiceNumber.$randNumber.'.pdf';
+                    $mpdf->Output($invoicePDF,'');
+                    if($db->setInvoiceUrlByInvoiceNumber($invoicePDF,$invoiceNumber))
+                    {
+                        $inv['invoiceUrl'] = WEBSITE_DOMAIN.$invoicePDF;
+                        $resp = array();
+                        $resp['error'] = false;
+                        $resp['message'] = INVOICE_FOUND_NEW;
+                        $resp['invoice'] = $inv;
+                        $response->write(json_encode($resp));
+                        return $response->withHeader(CT,AJ)
+                                        ->withStatus(200);
+                    }
+                }
+                else
+                {
+                    $inv['invoiceUrl'] = WEBSITE_DOMAIN.$invoiceUrl;
+                    $resp = array();
+                    $resp['error'] = false;
+                    $resp['message'] = INVOICE_FOUND;
+                    $resp['invoice'] = $inv;
+                    $response->write(json_encode($resp));
+                    return $response->withHeader(CT,AJ)
+                                    ->withStatus(200);
+                }
+            }
+            else
+                return returnException(true,INVOICE_NOT_FOUND,$response);
+        }
+        else
+            return returnException(true,INVOICE_NOT_FOUND,$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/invoice/{invoiceNumber}/payments',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $invoiceNumber = $args['invoiceNumber'];
+        if ($db->isInvoiceExist($invoiceNumber))
+        {
+            $payment = $db->getPaymentsByInvoiceNumber($invoiceNumber);
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = PAYMENT_FOUND;
+            $resp['payments'] = $payment;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,PAYMENT_NOT_FOUND,$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/invoice/{invoiceNumber}',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $invoiceNumber = $args['invoiceNumber'];
+        if ($db->isInvoiceExist($invoiceNumber))
+        {
+            $invoice = $db->getInvoiceByInvoiceNumber($invoiceNumber);
+            if(!empty($invoice))
+            {
+                $resp = array();
+                $resp['error'] = false;
+                $resp['message'] = "Invoice Found";
+                $resp['invoice'] = $invoice;
+                $response->write(json_encode($resp));
+                return $response->withHeader(CT,AJ)
+                                ->withStatus(200);
+            }
+            else
+                return returnException(true,INVOICE_NOT_FOUND,$response);
+        }
+        else
+            return returnException(true,INVOICE_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -236,14 +614,14 @@ $app->get('/sales/today',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "Sales List Found";
+            $resp['message'] = SALES_LIST_FOUND;
             $resp['sales'] = $sales;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Sales Record Found",$response);
+            return returnException(true,SALES_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -259,20 +637,89 @@ $app->get('/sales/all',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "Sales List Found";
+            $resp['message'] = SALES_LIST_FOUND;
             $resp['sales'] = $sales;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Sales Record Found",$response);
+            return returnException(true,SALES_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/brands',function(Request $request, Response $response)
+$app->get('/sales/status/months',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sales = $db->getSalesStatusOfEveryMonth();
+        if(!empty($sales))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Sales Record Found";
+            $resp['status'] = $sales;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"Sales Record Not Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/sales/status/days',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sales = $db->getSalesStatusOfEveryDay();
+        if(!empty($sales))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Sales Record Found";
+            $resp['status'] = $sales;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"Sales Record Not Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/sales/status/products',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $sales = $db->getTopTenMostSalesProduct();
+        if(!empty($sales))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Top 10 Sellings Product Found";
+            $resp['products'] = $sales;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Product Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/brands',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -282,20 +729,20 @@ $app->get('/get/brands',function(Request $request, Response $response)
         {
             $resp = array();
             $resp['error'] = false;
-            $resp['message'] = "Brand List Found";
+            $resp['message'] = BRAND_LIST_FOUND;
             $resp['brands'] = $brands;
             $response->write(json_encode($resp));
             return $response->withHeader(CT,AJ)
                             ->withStatus(200);
         }
         else
-            return returnException(true,"No Brands Found",$response);
+            return returnException(true,BRAND_NOT_FOUND,$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/sizes',function(Request $request, Response $response)
+$app->get('/sizes',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -318,7 +765,7 @@ $app->get('/get/sizes',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/categories',function(Request $request, Response $response)
+$app->get('/categories',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -341,7 +788,7 @@ $app->get('/get/categories',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/locations',function(Request $request, Response $response)
+$app->get('/locations',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -364,7 +811,7 @@ $app->get('/get/locations',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/products',function(Request $request, Response $response)
+$app->get('/products',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -387,7 +834,7 @@ $app->get('/get/products',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/product/{productId}',function(Request $request, Response $response, array $args)
+$app->get('/product/{productId}',function(Request $request, Response $response, array $args)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -411,8 +858,7 @@ $app->get('/get/product/{productId}',function(Request $request, Response $respon
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-//working not prepared yet
-$app->get('/get/products/records',function(Request $request, Response $response)
+$app->get('/products/records',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -476,6 +922,29 @@ $app->get('/counts/products/expiring',function(Request $request, Response $respo
         }
         else
             return returnException(true,"No Products Expiring Count Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/counts/products/expired',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $productsExpiringCount = $db->getExpiredProductsCount();
+        if(!empty($productsExpiringCount))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Products Expired Count Found";
+            $resp['products'] = $productsExpiringCount;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Products Expired Count Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -550,7 +1019,7 @@ $app->get('/counts/sales/today',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->get('/get/products/array',function(Request $request, Response $response)
+$app->get('/products/array',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -573,7 +1042,7 @@ $app->get('/get/products/array',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/size',function(Request $request, Response $response)
+$app->post('/size/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -620,6 +1089,121 @@ $app->post('/product/sell',function(Request $request, Response $response)
                 else
                     return returnException(true,SWW,$response);
             }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/product/sell/credit',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('salesId','creditorName','creditorAddress'),$request,$response))
+        {
+            $requestParameter = $request->getParsedBody();
+            $salesId = $requestParameter['salesId'];
+            $salesId = json_decode($salesId);
+            $creditorName = $requestParameter['creditorName'];
+            $creditorAddress = $requestParameter['creditorAddress'];
+            $creditorMobile = null;
+            $paidAmount = null;
+            $creditDescription = null;
+            if (isset($requestParameter['creditorMobile']) && !empty($requestParameter['creditorMobile'] ))
+                $creditorMobile = $requestParameter['creditorMobile'];
+            if (isset($requestParameter['paidAmount']) && !empty($requestParameter['paidAmount']))
+                $paidAmount = $requestParameter['paidAmount'];
+            if (isset($requestParameter['creditDescription']) && !empty($requestParameter['creditDescription']))
+                $creditDescription = $requestParameter['creditDescription'];
+            $result = $db->addCreditRecord($creditorName,$creditorMobile,$creditorAddress,$creditDescription,$paidAmount,$salesId);
+            if($result)
+                return returnException(false,'Credit Added',$response);
+            else
+                return returnException(true,SWW,$response);
+        }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/seller/product/sell',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('productId','invoiceNumber'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $productId = $requestParameter['productId'];
+                $invoiceNumber = $requestParameter['invoiceNumber'];
+                $result = $db->sellProductToSeller($productId,$invoiceNumber);
+                if($result==SELL_PRODUCT)
+                {
+                    $products = $db->getProductById($productId);
+                    $resp = array();
+                    $resp['error'] = false;
+                    $resp['message'] = SELL_PRODUCT;
+                    $resp['product'] = $products;
+                    $response->write(json_encode($resp));
+                    return $response->withHeader(CT,AJ)
+                                    ->withStatus(200);
+                }
+                else if($result==SELL_PRODUCT_FAILED)
+                    return returnException(true,SELL_PRODUCT_FAILED,$response);
+                else if($result==PRODUCT_QUANTITY_LOW)
+                    return returnException(true,PRODUCT_QUANTITY_LOW,$response);
+                else
+                    return returnException(true,SWW,$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/credits',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $credits = $db->getCredits();
+        if(!empty($credits))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Credits Found";
+            $resp['credits'] = $credits;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Credits Found",$response);
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->get('/credit/{creditId}',function(Request $request, Response $response, array $args)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        $creditId = $args['creditId'];
+        if (!$db->isCreditExist($creditId))
+            return returnException(true,"No Credit Found",$response);
+        $credits = $db->getCreditById($creditId);
+        if(!empty($credits))
+        {
+            $resp = array();
+            $resp['error'] = false;
+            $resp['message'] = "Credits Found";
+            $resp['credit'] = $credits;
+            $response->write(json_encode($resp));
+            return $response->withHeader(CT,AJ)
+                            ->withStatus(200);
+        }
+        else
+            return returnException(true,"No Credits Found",$response);
     }
     else
         return returnException(true,UNAUTH_ACCESS,$response);
@@ -718,6 +1302,30 @@ $app->post('/product/sell/delete',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
+$app->post('/seller/product/sell/delete',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('sellId'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $sellId = $requestParameter['sellId'];
+                $result = $db->deleteSellerSoldProduct($sellId);
+                if($result==SALE_RECORD_DELETED)
+                    return returnException(false,SALE_RECORD_DELETED,$response);
+                else if($result==SALE_RECORD_DELETE_FAILED)
+                    return returnException(true,SALE_RECORD_DELETE_FAILED,$response);
+                else if($result==SALE_NOT_EXIST)
+                    return returnException(true,SALE_NOT_EXIST,$response);
+                else
+                    return returnException(true,SWW,$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
 $app->post('/product/sell/update',function(Request $request, Response $response)
 {
     $db = new DbHandler;
@@ -729,7 +1337,10 @@ $app->post('/product/sell/update',function(Request $request, Response $response)
                 $saleId = $requestParameter['saleId'];
                 $productQuantity = $requestParameter['productQuantity'];
                 $productSellPrice = $requestParameter['productSellPrice'];
-                $result = $db->updateSellProduct($saleId,$productQuantity,$productSellPrice);
+                $productSellDiscount = 0;
+                if (isset($requestParameter['productSellDiscount']))
+                    $productSellDiscount = $requestParameter['productSellDiscount'];
+                $result = $db->updateSellProduct($saleId,$productQuantity,$productSellDiscount,$productSellPrice);
                 if($result == SALE_UPDATED)
                     return returnException(false,SALE_UPDATED,$response);
                 else if($result == SALE_UPDATE_FAILED)
@@ -746,7 +1357,36 @@ $app->post('/product/sell/update',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/category',function(Request $request, Response $response)
+$app->post('/seller/product/sell/update',function(Request $request, Response $response)
+{
+    $db = new DbHandler;
+    if (validateToken($db,$request,$response)) 
+    {
+        if(!checkEmptyParameter(array('saleId','productQuantity','sellDiscount','productSellPrice'),$request,$response))
+            {
+                $requestParameter = $request->getParsedBody();
+                $saleId = $requestParameter['saleId'];
+                $productQuantity = $requestParameter['productQuantity'];
+                $productSellPrice = $requestParameter['productSellPrice'];
+                $sellDiscount = $requestParameter['sellDiscount'];
+                $result = $db->updateSellerSellProducts($saleId,$productQuantity,$sellDiscount,$productSellPrice);
+                if($result == SALE_UPDATED)
+                    return returnException(false,SALE_UPDATED,$response);
+                else if($result == SALE_UPDATE_FAILED)
+                    return returnException(true,SALE_UPDATE_FAILED,$response);
+                else if($result == SALE_NOT_EXIST)
+                    return returnException(true,SALE_NOT_EXIST,$response);
+                else if($result==PRODUCT_QUANTITY_LOW)
+                    return returnException(true,PRODUCT_QUANTITY_LOW,$response);
+                else
+                    return returnException(true,SWW,$response);
+            }
+    }
+    else
+        return returnException(true,UNAUTH_ACCESS,$response);
+});
+
+$app->post('/category/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -765,7 +1405,7 @@ $app->post('/add/category',function(Request $request, Response $response)
         return returnException(true,UNAUTH_ACCESS,$response);
 });
 
-$app->post('/add/location',function(Request $request, Response $response)
+$app->post('/location/add',function(Request $request, Response $response)
 {
     $db = new DbHandler;
     if (validateToken($db,$request,$response)) 
@@ -801,6 +1441,179 @@ function checkEmptyParameter($requiredParameter,$request,$response)
     if($error)
         return returnException(true,"Required Parameter ".substr($errorParam,0,-2)." is missing",$response);
     return $error;
+}
+
+function makeInvoice($db,$invoiceInfo)
+{
+    require_once '../include/Constants.php';
+    // require_once __DIR__ . '../include/Constants.php';
+    $fullInvoiceHTMl = null;
+    $count = 0;
+    $companyName = COMPANY_NAME;
+    $companyEmail = COMPANY_EMAIL;
+    $companyNumber = COMPANY_CONTACT_NUMBER;
+    $companyAddress = COMPANY_ADDRESS;
+    $invoiceNumber = $invoiceInfo['invoiceNumber'];
+    $invoiceDate = $invoiceInfo['invoiceDate'];
+    $invoiceAmount = $invoiceInfo['invoiceAmount'];
+    $sellerName = $invoiceInfo['sellerName'];
+    $sellerImage = $invoiceInfo['sellerImage'];
+    $sellerNumber = $invoiceInfo['sellerContactNumber'];
+    $sellerAddress = $invoiceInfo['sellerAddress'];
+    $priceAllTotalAmount = $invoiceInfo['invoiceTotalPrice'];
+    $priceAllDiscountAmount = $invoiceInfo['invoiceAmount'];
+    $invoiceHeader = getInvoiceHeader($sellerImage,$companyName,$companyNumber,$companyEmail,$companyAddress,$sellerName,$sellerNumber,$sellerAddress,$invoiceNumber);
+    $fullInvoiceHTMl .= $invoiceHeader;
+    $products = $db->getSellerSellProductsByInvoiceNumber($invoiceInfo['invoiceNumber']);
+    
+    foreach ($products as $product)
+    {
+        $productName = $product['productName'];
+        $productSize = $product['productSize'];
+        $productPrice = $product['productPrice'];
+        $sellQuantity = $product['sellQuantity'];
+        $productTotalPrice = $product['productPrice']*$product['sellQuantity'];
+        $sellDiscount = $product['sellDiscount'].'%';
+        $sellPrice = $product['sellPrice'];
+        $count++;
+
+        $invoiceBody = <<<HERE
+        <tr>
+        <td class="col-md-1">$count</td>
+        <td class="col-md-9  col-xs-3">$productName</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$productSize</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$productPrice</td>
+        <td class="col-md-1 "><i class="fa fa-inr"></i>$sellQuantity</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$productTotalPrice</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$sellDiscount</td>
+        <td class="col-md-1"><i class="fa fa-inr"></i>$sellPrice</td>
+    </tr>
+    HERE;
+    $fullInvoiceHTMl .=$invoiceBody;
+    }
+
+    $invoiceFooter = getInvoiceFooter($priceAllTotalAmount,$priceAllDiscountAmount,$invoiceDate);
+    $fullInvoiceHTMl .=$invoiceFooter;
+    return $fullInvoiceHTMl;
+}
+
+function getInvoiceHeader($sellerImage,$companyName,$companyNumber,$companyEmail,$companyAddress,$sellerName,$sellerNumber,$sellerAddress,$invoiceNumber)
+{
+    $invoiceHeader = <<<HERE
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="../../../css/b.css" rel="stylesheet">
+        </head>
+        <body>
+        <div class="col-md-12">   
+        <div class="row">
+        <div class="receipt-main">
+        <div class="row">
+        <div class="receipt-header">
+        <div class="col-xs-7 col-sm-7 col-md-7">
+        <div class="receipt-left">
+        <img class="img-responsive" alt="sellerimage" src="$sellerImage" style="width: 71px; border-radius: 43px; border-radius:50%">
+        </div>
+        </div>
+        <div class="col-xs-4 col-sm-4 col-md-4 text-right">
+        <div class="receipt-right">
+        <h5>$companyName</h5>
+        <p>$companyNumber<i class="fa fa-phone"></i></p>
+        <p>$companyEmail<i class="fa fa-envelope-o"></i></p>
+        <p>$companyAddress<i class="fa fa-location-arrow"></i></p>
+        </div>
+        </div>
+        </div>
+        </div>
+        <div class="row">
+        <div class="receipt-header receipt-header-mid">
+        <div class="col-xs-8 col-sm-8 col-md-8 text-left">
+        <div class="receipt-right">
+        <h5>$sellerName</h5>
+        <p><b>Mobile :</b> +91 $sellerNumber</p>
+        <p><b>Address :</b> $sellerAddress</p>
+        </div>
+        </div>
+        <div class="col-xs-3 col-sm-3 col-md-3">
+        <div class="receipt-left">
+        <h3>INVOICE # $invoiceNumber</h3>
+        </div>
+        </div>
+        </div>
+        </div>
+        <div>
+        <table class="table table-bordered">
+        <thead>
+        <tr>
+        <th>Sr. No</th>
+        <th>Products</th>
+        <th>Size</th>
+        <th>Price</th>
+        <th>Quantity</th>
+        <th>Total</th>
+        <th>Discount</th>
+        <th>Amount</th>
+        </tr>
+        </thead>
+        <tbody>
+        HERE;
+return $invoiceHeader;
+}
+
+function getInvoiceFooter($priceAllTotalAmount,$priceAllDiscountAmount,$invoiceDate)
+{
+    $invoiceHeader = <<<HERE
+                  <tr>
+                  <td></td>
+                  <td class="text-right">
+                  <h2>
+                  <strong>Total: </strong>
+                  </h2>
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td class="text-left text-danger">
+                  <h2>
+                  <strong><i class="fa fa-inr"></i> $priceAllTotalAmount</strong>
+                  </h2>
+                  </td>
+                  <td></td>
+                  <td class="text-left text-danger">
+                  <h2>
+                  <strong><i class="fa fa-inr"></i> $priceAllDiscountAmount</strong>
+                  </h2>
+                  </td>
+                  </tr>
+                  </tbody>
+                  </table>
+                  </div>
+                  <div class="row">
+                  <div class="receipt-header receipt-header-mid receipt-footer">
+                  <div class="col-xs-8 col-sm-8 col-md-8 text-left">
+                  <div class="receipt-right">
+                  <p><b>Date :</b> $invoiceDate</p>
+                  <h5 style="color: rgb(140, 140, 140);">Thanks for shopping.!</h5>
+                  </div>
+                  </div>
+                  <div class="col-xs-2 col-sm-2 col-md-2">
+                  <div class="receipt-left">
+                  <h1>Signature</h1>
+                  </div>
+                  </div>
+                  </div>
+                  </div>
+                  </div>    
+                  </div>
+                  </div>
+                  </script>
+                  </body>
+                  </html>
+        HERE;
+        return $invoiceHeader;
 }
 
 /*
